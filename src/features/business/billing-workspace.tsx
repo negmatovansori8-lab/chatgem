@@ -42,11 +42,21 @@ export function BillingWorkspace() {
     };
   }, []);
 
-  // After Stripe redirect — confirm paid session with Stripe (real money only).
+  // After Stripe redirect — confirm paid session. Lemon activates via webhook.
   useEffect(() => {
     const paid = searchParams.get("paid");
     const sessionId = searchParams.get("session_id");
-    if (paid !== "1" || !sessionId) return;
+    const provider = searchParams.get("provider");
+    if (paid !== "1") return;
+
+    if (provider === "lemon" || !sessionId) {
+      setNotice(
+        "Пардохт қабул шуд. Агар Pro фавран фаъол нашавад — 10 сония интизор / саҳифаро навсозӣ кунед (webhook).",
+      );
+      void refresh();
+      window.history.replaceState({}, "", "/app/billing");
+      return;
+    }
 
     let cancelled = false;
     void (async () => {
@@ -166,22 +176,25 @@ export function BillingWorkspace() {
           <p className="mt-1 text-sm text-[var(--fg-muted)]">{t("billing.subtitle")}</p>
           {!paymentsConfigured ? (
             <p className="mt-2 rounded-xl bg-amber-500/15 px-3 py-2 text-sm text-amber-200">
-              Пардохти Pro/Business хомӯш аст. Барои фаъол кардан:{" "}
+              Пардохти Pro хомӯш аст. Барои Тоҷикистон:{" "}
               <a
                 className="underline"
-                href="https://dashboard.stripe.com/apikeys"
+                href="https://app.lemonsqueezy.com"
                 target="_blank"
                 rel="noreferrer"
               >
-                Stripe → API keys
+                Lemon Squeezy
               </a>{" "}
-              → <strong className="text-white">Secret key</strong>-ро гиред ва дар Render →
-              Environment ҳамчун <strong className="text-white">STRIPE_SECRET_KEY</strong>{" "}
-              гузоред, баъд Redeploy. Бе ин пул аз карта гирифта намешавад.
+              кушоед → маҳсулот Pro/Business → дар Render илова кунед:{" "}
+              <strong className="text-white">LEMON_SQUEEZY_API_KEY</strong>,{" "}
+              <strong className="text-white">LEMON_SQUEEZY_STORE_ID</strong>,{" "}
+              <strong className="text-white">LEMON_SQUEEZY_VARIANT_PRO</strong>,{" "}
+              <strong className="text-white">LEMON_SQUEEZY_VARIANT_BUSINESS</strong>,{" "}
+              <strong className="text-white">LEMON_SQUEEZY_WEBHOOK_SECRET</strong>.
             </p>
           ) : (
             <p className="mt-2 text-sm text-emerald-400/90">
-              Stripe пайваст аст — пардохт воқеӣ ($ ба ҳисоби Stripe / бонк).
+              Пардохт пайваст аст (Lemon Squeezy / Stripe) — пул ба ҳисоби провайдер, баъд ба шумо.
             </p>
           )}
         </div>

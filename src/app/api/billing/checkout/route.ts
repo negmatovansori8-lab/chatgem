@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestUserId } from "@/server/session";
 import { appUrl, getStripe, isStripeConfigured, planAmountCents } from "@/lib/stripe";
+import { createLemonCheckout, isLemonConfigured } from "@/lib/lemon-squeezy";
 import { PLANS } from "@/types/business";
 
 const bodySchema = z.object({
@@ -9,31 +10,10 @@ const bodySchema = z.object({
 });
 
 /**
- * Creates a real Stripe Checkout Session.
- * Money is charged only by Stripe and settles to the connected Stripe account / bank.
+ * Checkout: Lemon Squeezy preferred (works for many countries incl. Tajik creators),
+ * else Stripe when STRIPE_SECRET_KEY is set.
  */
 export async function POST(request: Request) {
-  if (!isStripeConfigured()) {
-    return NextResponse.json(
-      {
-        error: {
-          code: "PAYMENTS_NOT_CONFIGURED",
-          message:
-            "Пардохт пайваст нашудааст. STRIPE_SECRET_KEY дар .env гузоред. Бе Stripe пул аз карта гирифта намешавад.",
-        },
-      },
-      { status: 503 },
-    );
-  }
-
-  const stripe = getStripe();
-  if (!stripe) {
-    return NextResponse.json(
-      { error: { code: "PAYMENTS_NOT_CONFIGURED", message: "Stripe недоступен." } },
-      { status: 503 },
-    );
-  }
-
   const userId = await getRequestUserId();
   const body = await request.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(body);
@@ -50,6 +30,51 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: { code: "UNKNOWN_PLAN", message: "Неизвестный план." } },
       { status: 400 },
+    );
+  }
+
+  if (isLemonConfigured()) {
+    try {
+      const checkout = await createLemonCheckout({ planId, userId });
+      return NextResponse.json({
+        url: checkout.url,
+        checkoutId: checkout.checkoutId,
+        provider: "lemon",
+      });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "CHECKOUT_ERROR",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Lemon Squeezy checkout failed.",
+          },
+        },
+        { status: 502 },
+      );
+    }
+  }
+
+  if (!isStripeConfigured()) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "PAYMENTS_NOT_CONFIGURED",
+          message:
+            "Пардохт пайваст нашудааст. Lemon Squeezy (барои Тоҷикистон) ё Stripe-ро танзим кунед.",
+        },
+      },
+      { status: 503 },
+    );
+  }
+
+  const stripe = getStripe();
+  if (!stripe) {
+    return NextResponse.json(
+      { error: { code: "PAYMENTS_NOT_CONFIGURED", message: "Stripe недоступен." } },
+      { status: 503 },
     );
   }
 
@@ -93,5 +118,9 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ url: session.url, sessionId: session.id });
+  return NextResponse.json({
+    url: session.url,
+    sessionId: session.id,
+    provider: "stripe",
+  });
 }

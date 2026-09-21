@@ -88,13 +88,15 @@ export const plans = [
   },
 ] as const;
 
+import { isPaymentsConfigured } from "@/lib/lemon-squeezy";
+
 export const featureFlags = {
   aiProvidersConfigured:
     process.env.AI_PROVIDERS_CONFIGURED === "true" ||
     Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.GROQ_API_KEY?.trim()),
-  /** Real charges only when Stripe secret key is present. */
-  paymentsConfigured: Boolean(process.env.STRIPE_SECRET_KEY?.trim()),
-  /** DuckDuckGo works without keys; Tavily when WEB_SEARCH_CONFIGURED + key. */
+  /** Stripe and/or Lemon Squeezy. */
+  paymentsConfigured: isPaymentsConfigured(),
+  /** DuckDuckGo works without keys; Tavily when key present. */
   webSearchConfigured: true,
   voiceConfigured:
     process.env.VOICE_PROVIDERS_CONFIGURED !== "false" &&
