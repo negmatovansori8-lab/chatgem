@@ -1,0 +1,450 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+  INCOMPLETE
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum AgentRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(USER)
+  locale        String    @default("en")
+  theme         String    @default("system")
+  memoryEnabled Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts             Account[]
+  sessions             Session[]
+  subscription         Subscription?
+  usageRecords         Usage[]
+  chats                Chat[]
+  files                File[]
+  projects             Project[]
+  knowledgeBases       KnowledgeBase[]
+  agents               Agent[]
+  memories             Memory[]
+  notifications        Notification[]
+  referralsSent        Referral[]           @relation("Referrer")
+  referralReceived     Referral?            @relation("Referred")
+  organizationMembers  OrganizationMember[]
+  auditLogs            AuditLog[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Plan {
+  id           String   @id @default(cuid())
+  tier         PlanTier @unique
+  name         String
+  description  String?
+  priceMonthly Int      @default(0)
+  priceYearly  Int      @default(0)
+  currency     String   @default("USD")
+  features     Json
+  limits       Json
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id               String             @id @default(cuid())
+  userId           String             @unique
+  planId           String
+  status           SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean          @default(false)
+  externalId       String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@index([planId])
+  @@index([status])
+}
+
+model Usage {
+  id        String   @id @default(cuid())
+  userId    String
+  metric    String
+  amount    Int      @default(0)
+  periodKey String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, metric, periodKey])
+  @@index([userId])
+}
+
+model Chat {
+  id          String    @id @default(cuid())
+  userId      String
+  projectId   String?
+  title       String    @default("New chat")
+  modelId     String?
+  pinned      Boolean   @default(false)
+  archived    Boolean   @default(false)
+  sharedSlug  String?   @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project  Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  messages Message[]
+
+  @@index([userId, updatedAt])
+  @@index([projectId])
+}
+
+model Message {
+  id        String      @id @default(cuid())
+  chatId    String
+  role      MessageRole
+  content   String      @db.Text
+  modelId   String?
+  tokensIn  Int?
+  tokensOut Int?
+  metadata  Json?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  chat        Chat         @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
+
+  @@index([chatId, createdAt])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  messageId String
+  fileId    String?
+  name      String
+  mimeType  String
+  size      Int
+  url       String?
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  file    File?   @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([messageId])
+}
+
+model File {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  mimeType     String
+  size         Int
+  storageKey   String
+  status       String   @default("uploaded")
+  extractedText String? @db.Text
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments  Attachment[]
+  projectFiles ProjectFile[]
+  knowledgeItems KnowledgeItem[]
+
+  @@index([userId])
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  description  String?
+  instructions String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  files            ProjectFile[]
+  chats            Chat[]
+  knowledgeBases   KnowledgeBase[]
+
+  @@index([userId])
+}
+
+model ProjectFile {
+  id        String   @id @default(cuid())
+  projectId String
+  fileId    String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  file    File    @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, fileId])
+}
+
+model KnowledgeBase {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  items   KnowledgeItem[]
+
+  @@index([userId])
+}
+
+model KnowledgeItem {
+  id              String   @id @default(cuid())
+  knowledgeBaseId String
+  fileId          String?
+  title           String
+  content         String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  file          File?         @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([knowledgeBaseId])
+}
+
+model Agent {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  description  String?
+  instructions String   @db.Text
+  tools        Json?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runs AgentRun[]
+
+  @@index([userId])
+}
+
+model AgentRun {
+  id        String         @id @default(cuid())
+  agentId   String
+  status    AgentRunStatus @default(PENDING)
+  input     String         @db.Text
+  output    String?        @db.Text
+  progress  Json?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, createdAt])
+}
+
+model Tool {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String
+  category    String
+  config      Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AIProvider {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  name      String
+  isActive  Boolean   @default(false)
+  config    Json?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  models    AIModel[]
+}
+
+model AIModel {
+  id         String     @id @default(cuid())
+  providerId String
+  slug       String
+  name       String
+  kind       String
+  contextWindow Int?
+  isActive   Boolean    @default(false)
+  config     Json?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  provider AIProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, slug])
+}
+
+model Memory {
+  id        String   @id @default(cuid())
+  userId    String
+  content   String   @db.Text
+  category  String?
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  href      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
+
+model Referral {
+  id           String   @id @default(cuid())
+  referrerId   String
+  referredId   String?  @unique
+  code         String   @unique
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+  completedAt  DateTime?
+
+  referrer User  @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred User? @relation("Referred", fields: [referredId], references: [id], onDelete: SetNull)
+
+  @@index([referrerId])
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members OrganizationMember[]
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String   @default("member")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String?
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action])
+}

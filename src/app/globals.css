@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #050505;
+  --fg: #f7f7f8;
+  --fg-muted: #a1a1aa;
+  --fg-subtle: #71717a;
+  --surface: #121214;
+  --surface-2: #1c1c1f;
+  --surface-3: #27272a;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --accent: #3b82f6;
+  --accent-2: #60a5fa;
+  --accent-fg: #ffffff;
+  --accent-glow: color-mix(in oklab, var(--accent) 50%, transparent);
+  --ring: #3b82f6;
+  --danger: #f87171;
+  --grid-line: color-mix(in oklab, #ffffff 5%, transparent);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --composer: #1a1a1d;
+  --pill: #ffffff;
+  --pill-fg: #0a0a0a;
+}
+
+.light {
+  --bg: #f2f2f7;
+  --fg: #0a0a0a;
+  --fg-muted: #3c3c43;
+  --fg-subtle: #8e8e93;
+  --surface: #ffffff;
+  --surface-2: #f2f2f7;
+  --surface-3: #e5e5ea;
+  --border: #e5e5ea;
+  --border-strong: #c7c7cc;
+  --accent: #007aff;
+  --accent-2: #0a84ff;
+  --accent-fg: #ffffff;
+  --accent-glow: color-mix(in oklab, var(--accent) 35%, transparent);
+  --ring: #007aff;
+  --danger: #ff3b30;
+  --grid-line: color-mix(in oklab, #0a0a0a 6%, transparent);
+  --composer: #ffffff;
+  --pill: #0a0a0a;
+  --pill-fg: #ffffff;
+}
+
+.dark {
+  --bg: #050505;
+  --fg: #f7f7f8;
+  --fg-muted: #a1a1aa;
+  --fg-subtle: #71717a;
+  --surface: #121214;
+  --surface-2: #1c1c1f;
+  --surface-3: #27272a;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --accent: #3b82f6;
+  --accent-2: #60a5fa;
+  --accent-fg: #ffffff;
+  --accent-glow: color-mix(in oklab, var(--accent) 50%, transparent);
+  --ring: #3b82f6;
+  --danger: #f87171;
+  --grid-line: color-mix(in oklab, #ffffff 5%, transparent);
+  --composer: #1a1a1d;
+  --pill: #ffffff;
+  --pill-fg: #0a0a0a;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  height: 100%;
+  height: -webkit-fill-available;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body), system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100%;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  padding:
+    env(safe-area-inset-top, 0)
+    env(safe-area-inset-right, 0)
+    0
+    env(safe-area-inset-left, 0);
+}
+
+/* Phone: prevent iOS zoom on focus; comfortable tap targets */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+}
+
+::selection {
+  background: color-mix(in oklab, var(--accent) 35%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.font-display {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+}
+
+@keyframes authRise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-auth-rise {
+  animation: authRise 0.6s ease-out both;
+}
+
+@keyframes njRise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nj-rise {
+  animation: njRise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.nj-rise-delay-1 {
+  animation-delay: 0.08s;
+}
+.nj-rise-delay-2 {
+  animation-delay: 0.16s;
+}
+.nj-rise-delay-3 {
+  animation-delay: 0.24s;
+}
+.nj-rise-delay-4 {
+  animation-delay: 0.32s;
+}
+.nj-rise-delay-5 {
+  animation-delay: 0.4s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nj-rise,
+  .animate-auth-rise {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
