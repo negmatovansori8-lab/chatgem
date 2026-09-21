@@ -89,10 +89,15 @@ export const plans = [
 ] as const;
 
 export const featureFlags = {
-  aiProvidersConfigured: process.env.AI_PROVIDERS_CONFIGURED === "true",
+  aiProvidersConfigured:
+    process.env.AI_PROVIDERS_CONFIGURED === "true" ||
+    Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.GROQ_API_KEY?.trim()),
   /** Real charges only when Stripe secret key is present. */
   paymentsConfigured: Boolean(process.env.STRIPE_SECRET_KEY?.trim()),
-  webSearchConfigured: process.env.WEB_SEARCH_CONFIGURED === "true",
-  voiceConfigured: process.env.VOICE_PROVIDERS_CONFIGURED === "true",
-  imageConfigured: process.env.IMAGE_PROVIDERS_CONFIGURED === "true",
+  /** DuckDuckGo works without keys; Tavily when WEB_SEARCH_CONFIGURED + key. */
+  webSearchConfigured: true,
+  voiceConfigured:
+    process.env.VOICE_PROVIDERS_CONFIGURED !== "false" &&
+    Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.DEEPGRAM_API_KEY?.trim()),
+  imageConfigured: true,
 } as const;

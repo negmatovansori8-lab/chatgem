@@ -166,9 +166,18 @@ export function BillingWorkspace() {
           <p className="mt-1 text-sm text-[var(--fg-muted)]">{t("billing.subtitle")}</p>
           {!paymentsConfigured ? (
             <p className="mt-2 rounded-xl bg-amber-500/15 px-3 py-2 text-sm text-amber-200">
-              Пардохти воқеӣ ҳоло хомӯш аст. Бе{" "}
-              <strong className="text-white">STRIPE_SECRET_KEY</strong> пул аз карта гирифта
-              намешавад ва ба ҳисоби шумо намеояд.
+              Пардохти Pro/Business хомӯш аст. Барои фаъол кардан:{" "}
+              <a
+                className="underline"
+                href="https://dashboard.stripe.com/apikeys"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Stripe → API keys
+              </a>{" "}
+              → <strong className="text-white">Secret key</strong>-ро гиред ва дар Render →
+              Environment ҳамчун <strong className="text-white">STRIPE_SECRET_KEY</strong>{" "}
+              гузоред, баъд Redeploy. Бе ин пул аз карта гирифта намешавад.
             </p>
           ) : (
             <p className="mt-2 text-sm text-emerald-400/90">

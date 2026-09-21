@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https:",
               "media-src 'self' data: blob:",
               "font-src 'self' data:",
-              "connect-src 'self' https://api.openai.com https://api.groq.com https://api.tavily.com https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com",
+              "connect-src 'self' https://api.openai.com https://api.groq.com https://api.tavily.com https://image.pollinations.ai https://*.openai.com https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self' https://accounts.google.com https://github.com",

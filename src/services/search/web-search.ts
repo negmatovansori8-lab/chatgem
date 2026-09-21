@@ -69,12 +69,9 @@ async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
  * Never fabricates search hits.
  */
 export async function webSearch(query: string): Promise<WebSearchResponse> {
-  const tavily =
-    process.env.WEB_SEARCH_CONFIGURED === "true"
-      ? process.env.TAVILY_API_KEY
-      : process.env.TAVILY_API_KEY;
+  const tavily = process.env.TAVILY_API_KEY?.trim();
 
-  if (tavily && process.env.WEB_SEARCH_CONFIGURED === "true") {
+  if (tavily) {
     const res = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

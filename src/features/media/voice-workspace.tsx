@@ -59,7 +59,25 @@ export function VoiceWorkspace() {
     };
   }, []);
 
-  function speak(text: string) {
+  async function speak(text: string) {
+    if (!text.trim()) return;
+    try {
+      const res = await fetch("/api/voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "tts", text: text.slice(0, 4000) }),
+      });
+      const data = await res.json();
+      if (res.ok && typeof data.audioBase64 === "string") {
+        const audio = new Audio(
+          `data:${data.mimeType ?? "audio/mpeg"};base64,${data.audioBase64}`,
+        );
+        await audio.play();
+        return;
+      }
+    } catch {
+      // fall through to browser TTS
+    }
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
@@ -125,7 +143,7 @@ export function VoiceWorkspace() {
       },
     });
     setBusy(false);
-    if (text.trim()) speak(text);
+    if (text.trim()) void speak(text);
   }
 
   return (
@@ -184,7 +202,7 @@ export function VoiceWorkspace() {
           </button>
           <button
             type="button"
-            onClick={() => answer && speak(answer)}
+            onClick={() => answer && void speak(answer)}
             disabled={!answer}
             className="inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-sm disabled:opacity-40"
           >
