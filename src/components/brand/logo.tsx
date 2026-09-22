@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { brand } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -20,15 +21,22 @@ export function Logo({
       )}
       aria-label={`${brand.name} home`}
     >
-      <span className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-[linear-gradient(145deg,var(--accent),var(--accent-2))] shadow-[0_8px_24px_-10px_var(--accent-glow)]">
-        <span className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_30%_20%,white,transparent_55%)]" />
-        <span className="relative font-[family-name:var(--font-display)] text-sm font-bold tracking-tight text-[var(--accent-fg)]">
-          C
-        </span>
+      <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl shadow-[0_8px_24px_-10px_var(--accent-glow)]">
+        <Image
+          src="/chatgem-logo.png"
+          alt=""
+          width={72}
+          height={72}
+          className="h-full w-full object-contain"
+          priority
+        />
       </span>
       {showWordmark ? (
         <span className="font-[family-name:var(--font-display)] text-[15px] font-bold tracking-tight text-[var(--fg)]">
-          {brand.shortName}
+          <span className="text-[var(--fg)]">CHAT</span>
+          <span className="bg-gradient-to-r from-[#2563EB] to-[#7C3AED] bg-clip-text text-transparent">
+            GEM
+          </span>
         </span>
       ) : null}
     </Link>

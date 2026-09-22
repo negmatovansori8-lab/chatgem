@@ -1,10 +1,12 @@
 export const brand = {
-  name: "ChatGem",
+  name: "CHATGEM AI",
   shortName: "ChatGem",
-  tagline: "Multi-model intelligence for real work",
+  tagline: "AI Chat • Smart Answers • Fast Solutions",
   description:
     "Chat, agents, tools, projects, knowledge, coding, learning, voice, and image — one workspace built for serious teams and creators.",
   url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  sloganTg: "Ёвари зеҳнии сунъӣ барои ҳар рӯз",
+  sloganRu: "Умный AI помощник на каждый день",
 } as const;
 
 export const navigation = {

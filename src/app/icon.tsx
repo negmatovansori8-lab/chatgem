@@ -13,15 +13,15 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#3b82f6",
+          background: "linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)",
           borderRadius: 8,
           color: "white",
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: 800,
           fontFamily: "sans-serif",
         }}
       >
-        C
+        G
       </div>
     ),
     { ...size },
