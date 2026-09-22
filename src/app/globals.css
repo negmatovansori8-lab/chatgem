@@ -34,11 +34,11 @@
   --surface-3: #e5e5ea;
   --border: #e5e5ea;
   --border-strong: #c7c7cc;
-  --accent: #007aff;
-  --accent-2: #0a84ff;
+  --accent: #2563eb;
+  --accent-2: #7c3aed;
   --accent-fg: #ffffff;
   --accent-glow: color-mix(in oklab, var(--accent) 35%, transparent);
-  --ring: #007aff;
+  --ring: #2563eb;
   --danger: #ff3b30;
   --grid-line: color-mix(in oklab, #0a0a0a 6%, transparent);
   --composer: #ffffff;
