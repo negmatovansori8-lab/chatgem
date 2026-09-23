@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import {
   ArrowUp,
   Copy,
+  Download,
   Globe,
   ImageIcon,
   Mic,
@@ -30,7 +31,7 @@ import { getPlugin } from "@/features/tools/plugins-catalog";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { cn } from "@/lib/utils";
 import {
-  extractImagePrompt,
+  saveGeneratedImageToLibrary,
   wantsImageGeneration,
 } from "@/lib/image-prompt";
 
@@ -305,18 +306,27 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
     abortRef.current = controller;
     let liveChatId = activeChatId ?? chatId;
 
-    // Image generation in chat (DALL·E / Pollinations via /api/images).
+    // Image generation in chat (DALL·E / Pollinations via /api/images) — ChatGPT-style.
     if (wantsImageGeneration(text) && !pendingAttachments.length) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, pending: true, content: t("chat.creatingImage") }
+            : m,
+        ),
+      );
       try {
-        const imagePrompt = extractImagePrompt(text);
         const res = await fetch("/api/images", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: imagePrompt }),
+          body: JSON.stringify({ prompt: text }),
           signal: controller.signal,
         });
         const data = (await res.json()) as {
           url?: string;
+          kind?: string;
+          prompt?: string;
+          captionKey?: string;
           message?: string;
           error?: { message?: string };
         };
@@ -336,6 +346,13 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
             ),
           );
         } else {
+          const caption =
+            data.kind === "logo"
+              ? t("chat.logoReady")
+              : data.kind === "photo"
+                ? t("chat.photoReady")
+                : t("chat.imageReady");
+          saveGeneratedImageToLibrary(data.url, data.prompt || text);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
@@ -343,7 +360,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                     ...m,
                     pending: false,
                     imageUrl: data.url,
-                    content: data.message ?? "Тасвир омода.",
+                    content: caption,
                   }
                 : m,
             ),
@@ -548,7 +565,13 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                   className="flex items-center gap-3 text-left text-[15px] text-[var(--fg-muted)] transition hover:text-[var(--fg)]"
                   onClick={() => {
                     setInput(t("chat.createImagePrompt"));
-                    window.setTimeout(() => inputRef.current?.focus(), 0);
+                    window.setTimeout(() => {
+                      const el = inputRef.current;
+                      if (!el) return;
+                      el.focus();
+                      const len = el.value.length;
+                      el.setSelectionRange(len, len);
+                    }, 0);
                   }}
                 >
                   <ImageIcon className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
@@ -618,19 +641,44 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                 >
                   {message.role === "assistant" ? (
                     <>
-                      {message.pending && !message.content.trim() && !message.imageUrl ? (
-                        <TypingIndicator />
+                      {message.pending && !message.imageUrl ? (
+                        message.content.trim() ? (
+                          <p className="text-sm text-[var(--fg-muted)]">
+                            {message.content}
+                          </p>
+                        ) : (
+                          <TypingIndicator />
+                        )
                       ) : (
                         <div className="space-y-3">
                           {message.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={message.imageUrl}
-                              alt=""
-                              className="max-h-[min(70vh,560px)] w-full rounded-2xl border border-[var(--border)] object-contain bg-[var(--surface)]"
-                            />
+                            <div className="space-y-2">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={message.imageUrl}
+                                alt=""
+                                className="max-h-[min(70vh,560px)] w-full rounded-2xl border border-[var(--border)] object-contain bg-[var(--surface)]"
+                              />
+                              <div className="flex flex-wrap gap-2">
+                                <a
+                                  href={message.imageUrl}
+                                  download={`chatgem-${message.id.slice(0, 8)}.png`}
+                                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-[var(--fg-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  {t("chat.downloadImage")}
+                                </a>
+                                <Link
+                                  href="/app/gallery"
+                                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-[var(--fg-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
+                                >
+                                  <ImageIcon className="h-3.5 w-3.5" />
+                                  {t("chat.saveImage")}
+                                </Link>
+                              </div>
+                            </div>
                           ) : null}
-                          {message.content.trim() ? (
+                          {message.content.trim() && !message.pending ? (
                             <MarkdownMessage content={message.content} />
                           ) : null}
                         </div>

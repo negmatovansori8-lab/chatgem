@@ -154,6 +154,13 @@ export async function POST(request: Request) {
       : enhanced.kind;
   const prompt = enhanced.prompt;
 
+  const caption =
+    kind === "logo"
+      ? "logoReady"
+      : kind === "photo"
+        ? "photoReady"
+        : "imageReady";
+
   const openai = await generateWithOpenAI(prompt);
   if (openai.ok) {
     return NextResponse.json({
@@ -162,12 +169,13 @@ export async function POST(request: Request) {
       kind,
       url: openai.url,
       prompt,
+      captionKey: caption,
       message:
         kind === "logo"
-          ? "Логотип омода."
+          ? "Here is your logo."
           : kind === "photo"
-            ? "Сурат омода."
-            : `Тасвир омода (${openai.provider}).`,
+            ? "Here is your photo."
+            : "Here is your image.",
     });
   }
 
@@ -179,13 +187,14 @@ export async function POST(request: Request) {
       kind,
       url: poll.url,
       prompt,
+      captionKey: caption,
       openaiError: { detail: openai.detail, status: openai.status },
       message:
         kind === "logo"
-          ? "Логотип омода (Pollinations)."
+          ? "Here is your logo."
           : kind === "photo"
-            ? "Сурат омода (Pollinations)."
-            : "Тасвир омода (Pollinations).",
+            ? "Here is your photo."
+            : "Here is your image.",
     });
   }
 
