@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { enhanceImagePrompt } from "@/lib/image-prompt";
 
 export const maxDuration = 90;
 export const runtime = "nodejs";
 
 const schema = z.object({
   prompt: z.string().min(1).max(2000),
+  kind: z.enum(["logo", "photo", "general", "auto"]).optional(),
 });
 
 type GenOk = { ok: true; url: string; provider: string };
@@ -80,7 +82,10 @@ async function generateWithOpenAI(prompt: string): Promise<GenOk | GenFail> {
           return {
             ok: true,
             provider: String(body.model),
-            url: await toDataUrl(buf, img.headers.get("content-type") || "image/png"),
+            url: await toDataUrl(
+              buf,
+              img.headers.get("content-type") || "image/png",
+            ),
           };
         }
       }
@@ -93,10 +98,19 @@ async function generateWithOpenAI(prompt: string): Promise<GenOk | GenFail> {
   return { ok: false, detail: lastDetail, status: lastStatus };
 }
 
-async function generateWithPollinations(prompt: string): Promise<GenOk | GenFail> {
+async function generateWithPollinations(
+  prompt: string,
+  kind: "logo" | "photo" | "general",
+): Promise<GenOk | GenFail> {
   const encoded = encodeURIComponent(prompt);
   const seed = Date.now() % 100000;
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&nologo=true&seed=${seed}`;
+  const style =
+    kind === "logo"
+      ? "&model=flux&style=logo"
+      : kind === "photo"
+        ? "&model=flux"
+        : "&model=flux";
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&enhance=true&seed=${seed}${style}`;
 
   try {
     const res = await fetch(url, {
@@ -125,9 +139,6 @@ async function generateWithPollinations(prompt: string): Promise<GenOk | GenFail
   }
 }
 
-/**
- * Always returns an embeddable image (data URL) when successful.
- */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
@@ -138,28 +149,45 @@ export async function POST(request: Request) {
     );
   }
 
-  const prompt = parsed.data.prompt.trim();
+  const enhanced = enhanceImagePrompt(parsed.data.prompt);
+  const kind =
+    parsed.data.kind && parsed.data.kind !== "auto"
+      ? parsed.data.kind
+      : enhanced.kind;
+  const prompt = enhanced.prompt;
 
   const openai = await generateWithOpenAI(prompt);
   if (openai.ok) {
     return NextResponse.json({
       configured: true,
       provider: openai.provider,
+      kind,
       url: openai.url,
       prompt,
-      message: `Тасвир омода (${openai.provider}).`,
+      message:
+        kind === "logo"
+          ? "Логотип омода."
+          : kind === "photo"
+            ? "Сурат омода."
+            : `Тасвир омода (${openai.provider}).`,
     });
   }
 
-  const poll = await generateWithPollinations(prompt);
+  const poll = await generateWithPollinations(prompt, kind);
   if (poll.ok) {
     return NextResponse.json({
       configured: true,
       provider: poll.provider,
+      kind,
       url: poll.url,
       prompt,
       openaiError: { detail: openai.detail, status: openai.status },
-      message: "Тасвир омода (Pollinations).",
+      message:
+        kind === "logo"
+          ? "Логотип омода (Pollinations)."
+          : kind === "photo"
+            ? "Сурат омода (Pollinations)."
+            : "Тасвир омода (Pollinations).",
     });
   }
 

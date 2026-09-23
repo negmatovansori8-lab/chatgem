@@ -29,6 +29,10 @@ import {
 import { getPlugin } from "@/features/tools/plugins-catalog";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { cn } from "@/lib/utils";
+import {
+  extractImagePrompt,
+  wantsImageGeneration,
+} from "@/lib/image-prompt";
 
 type Bubble = {
   id: string;
@@ -45,27 +49,6 @@ type LocalAttachment = {
   dataUrl?: string;
   previewUrl?: string;
 };
-
-function wantsImageGeneration(text: string) {
-  const t = text.trim();
-  if (!t) return false;
-  return (
-    /^(нарисуй|нарисовать|создай\s+(изображен|картин|логотип|арт)|сгенерируй\s+(изображен|картин|логотип)|draw\s+|generate\s+(an?\s+)?(image|logo|picture)|create\s+(an?\s+)?(image|logo)|тасвир\s*соз|акс\s*соз|логотип\s*соз)/i.test(
-      t,
-    ) || /\b(dall-?e|text[\s-]?to[\s-]?image|txt2img)\b/i.test(t)
-  );
-}
-
-function extractImagePrompt(text: string) {
-  const cleaned = text
-    .trim()
-    .replace(
-      /^(пожалуйста[,.]?\s*)?(нарисуй|создай\s+изображение|создай\s+картинку|создай\s+логотип|сгенерируй\s+изображение|generate\s+an?\s+image\s+of|generate\s+image|create\s+an?\s+image\s+of|draw|тасвир\s*соз|акс\s*соз|логотип\s*соз)[:\s-]*/i,
-      "",
-    )
-    .trim();
-  return cleaned || text.trim();
-}
 
 async function fileToAttachment(file: File): Promise<LocalAttachment> {
   const base: LocalAttachment = {

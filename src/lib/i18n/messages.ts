@@ -137,7 +137,8 @@ export const en: Dictionary = {
   "chat.empty": "Start a conversation. Providers connect when configured.",
   "chat.askAnything": "Ask anything",
   "chat.createImage": "Create an image",
-  "chat.createImagePrompt": "Create an image: ",
+  "chat.createImagePrompt": "Create a logo: ChatGem AI",
+  "chat.createPhotoPrompt": "Create a photo: ",
   "chat.mediaHelper": "Photo, video, or movie help",
   "chat.mediaImageAsk": "What is in this photo? Identify it and help if I want edits.",
   "chat.mediaVideoAsk":
@@ -560,7 +561,8 @@ export const overlays: Record<string, Partial<Dictionary>> = {
     "chat.empty": "Начните диалог.",
     "chat.askAnything": "Спросите что угодно",
     "chat.createImage": "Создать изображение",
-    "chat.createImagePrompt": "Создай изображение: ",
+    "chat.createImagePrompt": "Создай логотип: ChatGem AI",
+    "chat.createPhotoPrompt": "Создай фото: ",
     "chat.mediaHelper": "Фото, видео или название фильма",
     "chat.mediaImageAsk":
       "Что на этом фото? Определи и помоги, если нужно улучшить.",
@@ -963,7 +965,8 @@ export const overlays: Record<string, Partial<Dictionary>> = {
     "welcome.enter": "Ба ChatGem ворид шавед",
     "chat.upgradePro": "+ Пайваст",
     "chat.createImage": "Тасвир созед",
-    "chat.createImagePrompt": "Тасвир соз: ",
+    "chat.createImagePrompt": "Логотип соз: ChatGem AI",
+    "chat.createPhotoPrompt": "Сурат соз: ",
     "chat.mediaHelper": "Сурат, видео ё номи кино",
     "chat.mediaImageAsk":
       "Дар ин сурат чӣ ҳаст? Муайян кунед ва агар тағйири зебо лозим бошад, кӯмак кунед.",
