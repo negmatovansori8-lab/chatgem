@@ -43,6 +43,15 @@ export function wantsImageGeneration(text: string) {
   if (!t || t.length > 1200) return false;
   if (NEGATIVE_RE.test(t)) return false;
 
+  // Fast path — no Unicode word-boundary tricks (must catch «Сурат соз: мошин»).
+  if (
+    /сурат\s*соз|тасвир\s*соз|акс\s*соз|логотип\s*соз|лагатип\s*соз|лагтип\s*соз|нарисуй|создай\s+(?:картин|изображ|фото|логотип)|сделай\s+(?:картин|изображ|фото|логотип)|сгенерируй\s+(?:картин|изображ|фото)|create\s+an?\s+image|create\s+a\s+(?:photo|logo)|generate\s+(?:an?\s+)?(?:image|photo|logo)|draw\s+(?:me\s+)?(?:an?\s+)?/i.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+
   if (EXPLICIT_GENERATE_RE.test(t)) return true;
 
   // Logo requests almost always mean generate.

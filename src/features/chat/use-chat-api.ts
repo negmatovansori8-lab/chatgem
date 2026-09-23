@@ -141,7 +141,8 @@ export async function streamChatMessage(input: {
       try {
         const json = JSON.parse(line.slice(5).trim()) as Record<string, unknown>;
         // `replace` is a full reply (rewrite path) — must count as content
-        if (json.type === "token" || json.type === "replace") sawContent = true;
+        if (json.type === "token" || json.type === "replace" || json.type === "image")
+          sawContent = true;
         if (json.type === "error") sawError = true;
         input.onEvent(json);
       } catch {
@@ -157,7 +158,8 @@ export async function streamChatMessage(input: {
         string,
         unknown
       >;
-      if (json.type === "token" || json.type === "replace") sawContent = true;
+      if (json.type === "token" || json.type === "replace" || json.type === "image")
+        sawContent = true;
       if (json.type === "error") sawError = true;
       input.onEvent(json);
     } catch {

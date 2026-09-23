@@ -433,6 +433,27 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
             );
           }
 
+          if (event.type === "image" && typeof event.url === "string") {
+            saveGeneratedImageToLibrary(event.url, text || displayText);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      imageUrl: event.url as string,
+                      pending: true,
+                      content:
+                        event.kind === "logo"
+                          ? t("chat.logoReady")
+                          : event.kind === "photo"
+                            ? t("chat.photoReady")
+                            : t("chat.imageReady"),
+                    }
+                  : m,
+              ),
+            );
+          }
+
           if (event.type === "replace" && typeof event.content === "string") {
             setMessages((prev) =>
               prev.map((m) =>
@@ -456,36 +477,53 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
           }
 
           if (event.type === "done") {
-            setMessages((prev) =>
-              prev.map((m) =>
+            setMessages((prev) => {
+              const keptImage = [...prev]
+                .reverse()
+                .find((m) => m.role === "assistant" && m.imageUrl)?.imageUrl;
+              return prev.map((m) =>
                 m.id === assistantId
                   ? {
                       ...m,
                       pending: false,
+                      imageUrl: m.imageUrl || keptImage,
                       content:
                         m.content.trim() ||
                         "Ҷавоб наомад. Regenerate-ро пахш кунед.",
                     }
                   : m,
-              ),
-            );
+              );
+            });
             setAttachments([]);
             if (liveChatId) {
               void fetch(`/api/chats/${liveChatId}`)
                 .then((r) => r.json())
                 .then((data) => {
                   if (data.chat?.title) setTitle(data.chat.title);
-                  // Sync from server so a remount/race can't leave a blank reply.
+                  // Sync text from server but keep in-memory generated imageUrl.
                   if (Array.isArray(data.messages) && data.messages.length) {
-                    setMessages(
-                      dedupeBubbles(
-                        (data.messages as MessageRecord[]).map((m) => ({
-                          id: m.id,
-                          role: m.role === "USER" ? "user" : "assistant",
-                          content: m.content,
-                        })),
-                      ),
-                    );
+                    setMessages((prev) => {
+                      const lastImageUrl = [...prev]
+                        .reverse()
+                        .find((m) => m.role === "assistant" && m.imageUrl)
+                        ?.imageUrl;
+                      const mapped: Bubble[] = (
+                        data.messages as MessageRecord[]
+                      ).map((m) => ({
+                        id: m.id,
+                        role: m.role === "USER" ? "user" : "assistant",
+                        content: m.content,
+                      }));
+                      if (lastImageUrl) {
+                        for (let i = mapped.length - 1; i >= 0; i -= 1) {
+                          if (mapped[i]?.role === "assistant") {
+                            mapped[i]!.imageUrl = lastImageUrl;
+                            break;
+                          }
+                        }
+                      }
+                      return dedupeBubbles(mapped);
+                    });
                   }
                 });
             }

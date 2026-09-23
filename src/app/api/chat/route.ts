@@ -12,6 +12,8 @@ import { streamChatCompletion } from "@/services/ai/stream";
 import { chatMessageSchema } from "@/types/chat";
 import { getLocaleInfo } from "@/lib/i18n/locales";
 import { pluginSystemPrompt } from "@/features/tools/plugins-catalog";
+import { wantsImageGeneration } from "@/lib/image-prompt";
+import { generateImageFromPrompt } from "@/lib/generate-image";
 
 function encodeSse(data: unknown) {
   return `data: ${JSON.stringify(data)}\n\n`;
@@ -177,9 +179,10 @@ function mediaCapabilityRules() {
   return [
     "MEDIA & VISION (mandatory when relevant):",
     "- Guests and signed-in users get full helpful answers — no account required to chat.",
+    "- IMAGE GENERATION: The app generates images automatically when the user asks (сурат соз, тасвир соз, нарисуй, create an image, logo, draw…). Do NOT say you cannot create images. Do NOT list Canva/Midjourney as a substitute for a clear generate request — the image pipeline handles it.",
     "- When images are attached: LOOK at them. Identify objects, posters, scenes, text (OCR), people/context.",
     "- Movie/show from screenshot, poster, or scene: give the most likely title(s) with short confidence note.",
-    "- Beautify / edit photo requests: describe concrete improvements (crop, light, color, background, retouch) and give step-by-step for free tools (Photos, Snapseed, CapCut). Suggest /app/gallery to generate a new nicer image from a prompt. Do not pretend you already output a new binary file in chat.",
+    "- Beautify / edit photo requests (when they already attached a photo): describe concrete improvements (crop, light, color, background, retouch) and give step-by-step for free tools (Photos, Snapseed, CapCut). Suggest /app/gallery for a brand-new image from a prompt.",
     "- Video file attached (no frame access): use filename + user text. Ask one short clarifying question only if needed. Still help identify titles and next steps.",
     "- Video/photo LINKS (YouTube, TikTok, Instagram, Telegram, etc.): help identify the film/clip from the URL/title/description the user gives.",
     "- ALWAYS give real clickable https:// links when helpful (YouTube, Google, IMDb, Wikipedia, official store pages). Prefer full URLs on their own line.",
@@ -518,6 +521,70 @@ export async function POST(request: Request) {
           }),
         ),
       );
+
+      // ChatGPT-style: generate images in chat instead of LLM refusal.
+      if (wantsImageGeneration(userContent) && !imageDataUrls.length) {
+        controller.enqueue(
+          encoder.encode(
+            encodeSse({
+              type: "status",
+              message: "creating_image",
+              chatId,
+            }),
+          ),
+        );
+        const img = await generateImageFromPrompt(userContent);
+        if (img.ok) {
+          const caption =
+            img.kind === "logo"
+              ? "Логотипи шумо омода."
+              : img.kind === "photo"
+                ? "Сурати шумо омода."
+                : "Тасвири шумо омода.";
+          await chatRepository.addMessage(userId, chatId!, {
+            role: "ASSISTANT",
+            content: `${caption}\n\n[image:${img.provider}]`,
+            modelId: usedModel ?? "image",
+          });
+          controller.enqueue(
+            encoder.encode(
+              encodeSse({
+                type: "image",
+                url: img.url,
+                kind: img.kind,
+                provider: img.provider,
+                chatId,
+              }),
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(
+              encodeSse({ type: "replace", content: caption, chatId }),
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(encodeSse({ type: "done", chatId })),
+          );
+          controller.close();
+          return;
+        }
+        const failMsg = `Тасвир сохта нашуд. ${img.detail} Gallery: /app/gallery`;
+        await chatRepository.addMessage(userId, chatId!, {
+          role: "ASSISTANT",
+          content: failMsg,
+          modelId: usedModel,
+        });
+        controller.enqueue(
+          encoder.encode(
+            encodeSse({ type: "replace", content: failMsg, chatId }),
+          ),
+        );
+        controller.enqueue(
+          encoder.encode(encodeSse({ type: "done", chatId })),
+        );
+        controller.close();
+        return;
+      }
 
       async function runOnce(prompt: string, streamTokens: boolean) {
         let text = "";
