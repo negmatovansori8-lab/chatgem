@@ -46,6 +46,27 @@ type LocalAttachment = {
   previewUrl?: string;
 };
 
+function wantsImageGeneration(text: string) {
+  const t = text.trim();
+  if (!t) return false;
+  return (
+    /^(нарисуй|нарисовать|создай\s+(изображен|картин|логотип|арт)|сгенерируй\s+(изображен|картин|логотип)|draw\s+|generate\s+(an?\s+)?(image|logo|picture)|create\s+(an?\s+)?(image|logo)|тасвир\s*соз|акс\s*соз|логотип\s*соз)/i.test(
+      t,
+    ) || /\b(dall-?e|text[\s-]?to[\s-]?image|txt2img)\b/i.test(t)
+  );
+}
+
+function extractImagePrompt(text: string) {
+  const cleaned = text
+    .trim()
+    .replace(
+      /^(пожалуйста[,.]?\s*)?(нарисуй|создай\s+изображение|создай\s+картинку|создай\s+логотип|сгенерируй\s+изображение|generate\s+an?\s+image\s+of|generate\s+image|create\s+an?\s+image\s+of|draw|тасвир\s*соз|акс\s*соз|логотип\s*соз)[:\s-]*/i,
+      "",
+    )
+    .trim();
+  return cleaned || text.trim();
+}
+
 async function fileToAttachment(file: File): Promise<LocalAttachment> {
   const base: LocalAttachment = {
     name: file.name,
@@ -299,6 +320,72 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
     abortRef.current = controller;
     let liveChatId = activeChatId ?? chatId;
 
+    // Image generation in chat (DALL·E / Pollinations via /api/images).
+    if (wantsImageGeneration(text) && !pendingAttachments.length) {
+      try {
+        const imagePrompt = extractImagePrompt(text);
+        const res = await fetch("/api/images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: imagePrompt }),
+          signal: controller.signal,
+        });
+        const data = (await res.json()) as {
+          url?: string;
+          message?: string;
+          error?: { message?: string };
+        };
+        if (!res.ok || typeof data.url !== "string") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    pending: false,
+                    content:
+                      data.error?.message ??
+                      data.message ??
+                      "Тасвир сохта нашуд. Gallery-ро ҳам санҷед: /app/gallery",
+                  }
+                : m,
+            ),
+          );
+        } else {
+          const safeAlt = imagePrompt.replace(/]/g, "'").slice(0, 120);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    pending: false,
+                    content: `![${safeAlt}](${data.url})\n\n${data.message ?? "Тасвир омода."}`,
+                  }
+                : m,
+            ),
+          );
+        }
+      } catch (error) {
+        if ((error as Error)?.name !== "AbortError") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    pending: false,
+                    content: "Хатои тасвирсозӣ. Бори дигар кӯшиш кунед.",
+                  }
+                : m,
+            ),
+          );
+        }
+      } finally {
+        sendingRef.current = false;
+        setBusy(false);
+        abortRef.current = null;
+      }
+      return;
+    }
+
     try {
       await streamChatMessage({
         chatId: liveChatId,
@@ -471,13 +558,17 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                   <ImageIcon className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
                   {t("chat.mediaHelper")}
                 </button>
-                <Link
-                  href="/app/gallery"
-                  className="flex items-center gap-3 text-[15px] text-[var(--fg-muted)] transition hover:text-[var(--fg)]"
+                <button
+                  type="button"
+                  className="flex items-center gap-3 text-left text-[15px] text-[var(--fg-muted)] transition hover:text-[var(--fg)]"
+                  onClick={() => {
+                    setInput(t("chat.createImagePrompt"));
+                    window.setTimeout(() => inputRef.current?.focus(), 0);
+                  }}
                 >
                   <ImageIcon className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
                   {t("chat.createImage")}
-                </Link>
+                </button>
                 <button
                   type="button"
                   className="flex items-center gap-3 text-left text-[15px] text-[var(--fg-muted)] transition hover:text-[var(--fg)]"

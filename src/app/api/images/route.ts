@@ -1,82 +1,132 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+export const maxDuration = 90;
+export const runtime = "nodejs";
+
 const schema = z.object({
   prompt: z.string().min(1).max(2000),
 });
 
-type OpenAIResult =
-  | { ok: true; url: string; model: string }
-  | { ok: false; status: number; detail: string };
+type GenOk = { ok: true; url: string; provider: string };
+type GenFail = { ok: false; detail: string; status?: number };
 
-async function generateWithOpenAI(prompt: string): Promise<OpenAIResult> {
+async function toDataUrl(
+  bytes: ArrayBuffer,
+  mime = "image/png",
+): Promise<string> {
+  const b64 = Buffer.from(bytes).toString("base64");
+  return `data:${mime};base64,${b64}`;
+}
+
+async function generateWithOpenAI(prompt: string): Promise<GenOk | GenFail> {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) {
-    return { ok: false, status: 0, detail: "OPENAI_API_KEY missing on server" };
+    return { ok: false, detail: "OPENAI_API_KEY missing" };
   }
 
-  // Try DALL·E 3, then DALL·E 2 (wider availability on some accounts).
-  const attempts: Array<{ model: string; size: string }> = [
-    { model: "dall-e-3", size: "1024x1024" },
-    { model: "dall-e-2", size: "1024x1024" },
+  const attempts: Array<Record<string, unknown>> = [
+    {
+      model: "dall-e-3",
+      prompt,
+      n: 1,
+      size: "1024x1024",
+      response_format: "b64_json",
+      quality: "standard",
+    },
+    {
+      model: "dall-e-2",
+      prompt,
+      n: 1,
+      size: "512x512",
+      response_format: "b64_json",
+    },
   ];
 
-  let lastDetail = "unknown";
+  let lastDetail = "OpenAI images failed";
   let lastStatus = 0;
 
-  for (const attempt of attempts) {
+  for (const body of attempts) {
     const res = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: attempt.model,
-        prompt,
-        n: 1,
-        size: attempt.size,
-      }),
+      body: JSON.stringify(body),
     });
-
     const raw = await res.text().catch(() => "");
     if (!res.ok) {
       lastStatus = res.status;
-      lastDetail = raw.slice(0, 280) || `HTTP ${res.status}`;
+      lastDetail = raw.slice(0, 300) || `HTTP ${res.status}`;
       continue;
     }
-
     try {
       const data = JSON.parse(raw) as {
         data?: Array<{ url?: string; b64_json?: string }>;
       };
       const first = data.data?.[0];
-      if (first?.url) {
-        return { ok: true, url: first.url, model: attempt.model };
-      }
       if (first?.b64_json) {
         return {
           ok: true,
+          provider: String(body.model),
           url: `data:image/png;base64,${first.b64_json}`,
-          model: attempt.model,
         };
       }
-      lastDetail = "OpenAI returned empty image payload";
+      if (first?.url) {
+        const img = await fetch(first.url);
+        if (img.ok) {
+          const buf = await img.arrayBuffer();
+          return {
+            ok: true,
+            provider: String(body.model),
+            url: await toDataUrl(buf, img.headers.get("content-type") || "image/png"),
+          };
+        }
+      }
+      lastDetail = "Empty image payload from OpenAI";
     } catch {
-      lastDetail = "Invalid JSON from OpenAI images API";
+      lastDetail = "Invalid OpenAI response";
     }
   }
 
-  return { ok: false, status: lastStatus, detail: lastDetail };
+  return { ok: false, detail: lastDetail, status: lastStatus };
 }
 
-function pollinationsUrl(prompt: string) {
+async function generateWithPollinations(prompt: string): Promise<GenOk | GenFail> {
   const encoded = encodeURIComponent(prompt);
-  return `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&enhance=true&seed=${Date.now() % 100000}`;
+  const seed = Date.now() % 100000;
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&nologo=true&seed=${seed}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: "image/*" },
+      signal: AbortSignal.timeout(75_000),
+    });
+    if (!res.ok) {
+      return { ok: false, detail: `Pollinations HTTP ${res.status}` };
+    }
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength < 1000) {
+      return { ok: false, detail: "Pollinations returned empty image" };
+    }
+    const mime = res.headers.get("content-type") || "image/jpeg";
+    return {
+      ok: true,
+      provider: "pollinations",
+      url: await toDataUrl(buf, mime),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      detail:
+        error instanceof Error ? error.message : "Pollinations fetch failed",
+    };
+  }
 }
 
 /**
- * Image generation: OpenAI DALL·E when available, else free Pollinations.
+ * Always returns an embeddable image (data URL) when successful.
  */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -90,42 +140,37 @@ export async function POST(request: Request) {
 
   const prompt = parsed.data.prompt.trim();
 
-  try {
-    const openai = await generateWithOpenAI(prompt);
-    if (openai.ok) {
-      return NextResponse.json({
-        configured: true,
-        provider: `openai-${openai.model}`,
-        url: openai.url,
-        prompt,
-        message: `Тасвир бо ${openai.model} сохта шуд.`,
-      });
-    }
-
-    const url = pollinationsUrl(prompt);
+  const openai = await generateWithOpenAI(prompt);
+  if (openai.ok) {
     return NextResponse.json({
       configured: true,
-      provider: "pollinations",
-      url,
+      provider: openai.provider,
+      url: openai.url,
       prompt,
-      openaiError: {
-        status: openai.status,
-        detail: openai.detail,
-      },
-      message:
-        "OpenAI тасвир надод — Pollinations (бепул). 10–30 сония интизор шавед то акс бор шавад. Агар холӣ монад, промпти дигар санҷед.",
-    });
-  } catch (error) {
-    const url = pollinationsUrl(prompt);
-    return NextResponse.json({
-      configured: true,
-      provider: "pollinations",
-      url,
-      prompt,
-      message:
-        error instanceof Error
-          ? `Хато: ${error.message}. Pollinations истифода шуд.`
-          : "Хато — Pollinations истифода шуд.",
+      message: `Тасвир омода (${openai.provider}).`,
     });
   }
+
+  const poll = await generateWithPollinations(prompt);
+  if (poll.ok) {
+    return NextResponse.json({
+      configured: true,
+      provider: poll.provider,
+      url: poll.url,
+      prompt,
+      openaiError: { detail: openai.detail, status: openai.status },
+      message: "Тасвир омода (Pollinations).",
+    });
+  }
+
+  return NextResponse.json(
+    {
+      error: {
+        code: "IMAGE_FAILED",
+        message: `Тасвир сохта нашуд. OpenAI: ${openai.detail}. Fallback: ${poll.detail}`,
+      },
+      openaiError: { detail: openai.detail, status: openai.status },
+    },
+    { status: 502 },
+  );
 }

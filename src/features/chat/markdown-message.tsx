@@ -125,6 +125,15 @@ export function MarkdownMessage({
               {children}
             </blockquote>
           ),
+          img: ({ src, alt }) =>
+            src ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={src}
+                alt={alt || ""}
+                className="my-2 max-h-[min(70vh,520px)] w-full rounded-2xl border border-[var(--border)] object-contain bg-[var(--surface)]"
+              />
+            ) : null,
         }}
       >
         {content}
