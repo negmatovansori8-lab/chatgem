@@ -11,6 +11,8 @@ export type ChatModelOption = {
   configured: boolean;
 };
 
+const fetchOpts: RequestInit = { credentials: "include" };
+
 export function useChatList(query = "") {
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,7 +20,7 @@ export function useChatList(query = "") {
   const refresh = useCallback(async () => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
-    const res = await fetch(`/api/chats?${params.toString()}`);
+    const res = await fetch(`/api/chats?${params.toString()}`, fetchOpts);
     const data = await res.json();
     setChats(data.chats ?? []);
     setLoading(false);
@@ -30,7 +32,7 @@ export function useChatList(query = "") {
     void (async () => {
       const params = new URLSearchParams();
       if (query) params.set("q", query);
-      const res = await fetch(`/api/chats?${params.toString()}`);
+      const res = await fetch(`/api/chats?${params.toString()}`, fetchOpts);
       const data = await res.json();
       if (cancelled) return;
       setChats(data.chats ?? []);
@@ -51,7 +53,7 @@ export function useModels() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/models")
+    void fetch("/api/models", fetchOpts)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -66,61 +68,17 @@ export function useModels() {
   return { models, configuredCount };
 }
 
-export async function streamChatMessage(input: {
-  chatId?: string;
-  content: string;
-  modelId?: string;
-  locale?: string;
-  pluginId?: string;
-  agentInstructions?: string;
-  attachments?: Array<{
-    name: string;
-    mimeType: string;
-    size: number;
-    dataUrl?: string;
-  }>;
-  signal?: AbortSignal;
-  onEvent: (event: Record<string, unknown>) => void;
-}) {
-  let res: Response;
-  try {
-    res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chatId: input.chatId,
-        content: input.content,
-        ...(input.modelId ? { modelId: input.modelId } : {}),
-        ...(input.locale ? { locale: input.locale } : {}),
-        ...(input.pluginId ? { pluginId: input.pluginId } : {}),
-        ...(input.agentInstructions
-          ? { agentInstructions: input.agentInstructions }
-          : {}),
-        attachments: input.attachments,
-      }),
-      signal: input.signal,
-    });
-  } catch (error) {
-    if (input.signal?.aborted) {
-      input.onEvent({ type: "error", code: "ABORTED", message: "Stopped." });
-      return;
-    }
-    input.onEvent({
-      type: "error",
-      code: "NETWORK",
-      message:
-        error instanceof Error ? error.message : "Network error — could not reach the server.",
-    });
-    return;
-  }
-
+async function readSseStream(
+  res: Response,
+  onEvent: (event: Record<string, unknown>) => void,
+) {
   if (!res.body) {
-    input.onEvent({
+    onEvent({
       type: "error",
       code: "NO_STREAM",
       message: "Streaming response body missing",
     });
-    return;
+    return { sawContent: false, sawError: true, notFound: false };
   }
 
   const reader = res.body.getReader();
@@ -128,6 +86,18 @@ export async function streamChatMessage(input: {
   let buffer = "";
   let sawContent = false;
   let sawError = false;
+  let notFound = false;
+
+  const handle = (json: Record<string, unknown>) => {
+    if (json.type === "token" || json.type === "replace" || json.type === "image") {
+      sawContent = true;
+    }
+    if (json.type === "error") {
+      sawError = true;
+      if (json.code === "NOT_FOUND") notFound = true;
+    }
+    onEvent(json);
+  };
 
   while (true) {
     const { done, value } = await reader.read();
@@ -139,35 +109,96 @@ export async function streamChatMessage(input: {
       const line = part.trim();
       if (!line.startsWith("data:")) continue;
       try {
-        const json = JSON.parse(line.slice(5).trim()) as Record<string, unknown>;
-        // `replace` is a full reply (rewrite path) — must count as content
-        if (json.type === "token" || json.type === "replace" || json.type === "image")
-          sawContent = true;
-        if (json.type === "error") sawError = true;
-        input.onEvent(json);
+        handle(JSON.parse(line.slice(5).trim()) as Record<string, unknown>);
       } catch {
         // ignore
       }
     }
   }
 
-  // Flush trailing SSE frame if the stream ended without a final blank line
   if (buffer.trim().startsWith("data:")) {
     try {
-      const json = JSON.parse(buffer.trim().slice(5).trim()) as Record<
-        string,
-        unknown
-      >;
-      if (json.type === "token" || json.type === "replace" || json.type === "image")
-        sawContent = true;
-      if (json.type === "error") sawError = true;
-      input.onEvent(json);
+      handle(
+        JSON.parse(buffer.trim().slice(5).trim()) as Record<string, unknown>,
+      );
     } catch {
       // ignore
     }
   }
 
-  if (!sawContent && !sawError) {
+  return { sawContent, sawError, notFound };
+}
+
+export async function streamChatMessage(input: {
+  chatId?: string;
+  content: string;
+  modelId?: string;
+  locale?: string;
+  pluginId?: string;
+  agentInstructions?: string;
+  forceImage?: boolean;
+  attachments?: Array<{
+    name: string;
+    mimeType: string;
+    size: number;
+    dataUrl?: string;
+  }>;
+  signal?: AbortSignal;
+  onEvent: (event: Record<string, unknown>) => void;
+}) {
+  async function post(chatId?: string) {
+    return fetch("/api/chat", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...(chatId ? { chatId } : {}),
+        content: input.content,
+        ...(input.modelId ? { modelId: input.modelId } : {}),
+        ...(input.locale ? { locale: input.locale } : {}),
+        ...(input.pluginId ? { pluginId: input.pluginId } : {}),
+        ...(input.agentInstructions
+          ? { agentInstructions: input.agentInstructions }
+          : {}),
+        ...(input.forceImage ? { forceImage: true } : {}),
+        attachments: input.attachments,
+      }),
+      signal: input.signal,
+    });
+  }
+
+  let res: Response;
+  try {
+    res = await post(input.chatId);
+  } catch (error) {
+    if (input.signal?.aborted) {
+      input.onEvent({ type: "error", code: "ABORTED", message: "Stopped." });
+      return;
+    }
+    input.onEvent({
+      type: "error",
+      code: "NETWORK",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Network error — could not reach the server.",
+    });
+    return;
+  }
+
+  let result = await readSseStream(res, input.onEvent);
+
+  // Legacy servers may still 404 — retry once as a brand-new chat.
+  if (result.notFound && input.chatId && !input.signal?.aborted) {
+    try {
+      res = await post(undefined);
+      result = await readSseStream(res, input.onEvent);
+    } catch {
+      // already reported
+    }
+  }
+
+  if (!result.sawContent && !result.sawError) {
     input.onEvent({
       type: "error",
       code: "EMPTY_REPLY",

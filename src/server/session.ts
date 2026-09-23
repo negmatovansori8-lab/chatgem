@@ -15,12 +15,28 @@ function guestCookieOptions() {
   };
 }
 
+function guestIdFromCookieHeader(request?: Request): string | undefined {
+  if (!request) return undefined;
+  const raw = request.headers.get("cookie") || "";
+  const m = raw.match(/(?:^|;\s*)nj_guest_id=([^;]+)/);
+  if (!m?.[1]) return undefined;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+}
+
 /**
  * Prefer signed-in auth user; otherwise stable guest cookie.
+ * Pass `request` so we can read Cookie even when `cookies().set` is read-only.
  */
-export async function getRequestUserId(): Promise<string> {
+export async function getRequestUserId(request?: Request): Promise<string> {
   const session = await getSessionUser();
   if (session?.id) return session.id;
+
+  const fromRequest = guestIdFromCookieHeader(request);
+  if (fromRequest) return fromRequest;
 
   const jar = await cookies();
   const existing = jar.get(GUEST_COOKIE)?.value;
@@ -30,7 +46,7 @@ export async function getRequestUserId(): Promise<string> {
   try {
     jar.set(GUEST_COOKIE, id, guestCookieOptions());
   } catch {
-    // Read-only cookie contexts — API routes should attach via withGuestCookie.
+    // Read-only cookie contexts — API routes attach via appendGuestCookie / withGuestCookie.
   }
   return id;
 }

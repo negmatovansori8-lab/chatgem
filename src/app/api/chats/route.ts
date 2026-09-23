@@ -4,7 +4,7 @@ import { getRequestUserId, withGuestCookie } from "@/server/session";
 import { createChatSchema } from "@/types/chat";
 
 export async function GET(request: Request) {
-  const userId = await getRequestUserId();
+  const userId = await getRequestUserId(request);
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q") ?? undefined;
   const includeArchived = searchParams.get("archived") === "1";
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const userId = await getRequestUserId();
+  const userId = await getRequestUserId(request);
   const body = await request.json().catch(() => ({}));
   const parsed = createChatSchema.safeParse(body);
   if (!parsed.success) {

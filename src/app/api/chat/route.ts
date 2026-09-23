@@ -414,7 +414,7 @@ async function buildSystemPrompt(
 }
 
 export async function POST(request: Request) {
-  const userId = await getRequestUserId();
+  const userId = await getRequestUserId(request);
   const body = await request.json().catch(() => null);
   const parsed = chatMessageSchema.safeParse(body);
   if (!parsed.success) {
@@ -433,24 +433,19 @@ export async function POST(request: Request) {
     );
   }
 
+  // Never block answers on a stale chatId (Render disk wipe / guest mismatch).
   let chatId = parsed.data.chatId;
+  if (chatId) {
+    const existing = await chatRepository.get(userId, chatId);
+    if (!existing) {
+      chatId = undefined;
+    }
+  }
   if (!chatId) {
     const chat = await chatRepository.create(userId, {
       modelId: parsed.data.modelId,
     });
     chatId = chat.id;
-  } else {
-    const existing = await chatRepository.get(userId, chatId);
-    if (!existing) {
-      const headers = new Headers({
-        "Content-Type": "text/event-stream; charset=utf-8",
-      });
-      appendGuestCookie(headers, userId);
-      return new Response(
-        encodeSse({ type: "error", code: "NOT_FOUND", message: "Chat not found" }),
-        { status: 404, headers },
-      );
-    }
   }
 
   const rawAttachments = parsed.data.attachments ?? [];

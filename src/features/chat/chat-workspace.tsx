@@ -218,11 +218,21 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
       return;
     }
     let cancelled = false;
-    void fetch(`/api/chats/${chatId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled || !data.chat) return;
-        // Don't clobber an in-flight stream with a stale fetch.
+    void fetch(`/api/chats/${chatId}`, { credentials: "include" })
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        // Stale URL after deploy / disk wipe — start clean, keep answering next message.
+        if (!r.ok || !data.chat) {
+          setActiveChatId(undefined);
+          streamChatIdRef.current = undefined;
+          setMessages([]);
+          setTitle("ChatGem");
+          if (typeof window !== "undefined") {
+            window.history.replaceState(null, "", "/app/chat");
+          }
+          return;
+        }
         if (sendingRef.current && streamChatIdRef.current === chatId) return;
         setTitle(data.chat.title);
         if (data.chat.modelId) setModelId(data.chat.modelId);
@@ -505,7 +515,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
             });
             setAttachments([]);
             if (liveChatId) {
-              void fetch(`/api/chats/${liveChatId}`)
+              void fetch(`/api/chats/${liveChatId}`, { credentials: "include" })
                 .then((r) => r.json())
                 .then((data) => {
                   if (data.chat?.title) setTitle(data.chat.title);
