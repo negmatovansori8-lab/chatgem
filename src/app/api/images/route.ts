@@ -33,7 +33,6 @@ async function generateWithOpenAI(prompt: string): Promise<GenOk | GenFail> {
       prompt,
       n: 1,
       size: "1024x1024",
-      response_format: "b64_json",
       quality: "standard",
     },
     {
@@ -41,7 +40,6 @@ async function generateWithOpenAI(prompt: string): Promise<GenOk | GenFail> {
       prompt,
       n: 1,
       size: "512x512",
-      response_format: "b64_json",
     },
   ];
 

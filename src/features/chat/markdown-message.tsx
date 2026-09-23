@@ -42,6 +42,19 @@ export function MarkdownMessage({
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
+        urlTransform={(url) => {
+          const value = String(url || "");
+          if (
+            value.startsWith("data:image/") ||
+            value.startsWith("blob:") ||
+            value.startsWith("https:") ||
+            value.startsWith("http:") ||
+            value.startsWith("/")
+          ) {
+            return value;
+          }
+          return "";
+        }}
         components={{
           a: ({ href, children }) => (
             <a

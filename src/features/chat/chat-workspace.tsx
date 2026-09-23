@@ -40,6 +40,8 @@ type Bubble = {
   content: string;
   pending?: boolean;
   previewUrls?: string[];
+  /** Generated image (data URL or https) — rendered outside markdown. */
+  imageUrl?: string;
 };
 
 type LocalAttachment = {
@@ -334,14 +336,14 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
             ),
           );
         } else {
-          const safeAlt = imagePrompt.replace(/]/g, "'").slice(0, 120);
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
                 ? {
                     ...m,
                     pending: false,
-                    content: `![${safeAlt}](${data.url})\n\n${data.message ?? "Тасвир омода."}`,
+                    imageUrl: data.url,
+                    content: data.message ?? "Тасвир омода.",
                   }
                 : m,
             ),
@@ -616,14 +618,24 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                 >
                   {message.role === "assistant" ? (
                     <>
-                      {message.pending && !message.content.trim() ? (
+                      {message.pending && !message.content.trim() && !message.imageUrl ? (
                         <TypingIndicator />
                       ) : (
-                        <MarkdownMessage
-                          content={message.content || ""}
-                        />
+                        <div className="space-y-3">
+                          {message.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={message.imageUrl}
+                              alt=""
+                              className="max-h-[min(70vh,560px)] w-full rounded-2xl border border-[var(--border)] object-contain bg-[var(--surface)]"
+                            />
+                          ) : null}
+                          {message.content.trim() ? (
+                            <MarkdownMessage content={message.content} />
+                          ) : null}
+                        </div>
                       )}
-                      {!message.pending && message.content.trim() ? (
+                      {!message.pending && (message.content.trim() || message.imageUrl) ? (
                         <div className="mt-2 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                           <button
                             type="button"
