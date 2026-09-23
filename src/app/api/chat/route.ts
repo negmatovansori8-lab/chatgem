@@ -523,7 +523,10 @@ export async function POST(request: Request) {
       );
 
       // ChatGPT-style: generate images in chat instead of LLM refusal.
-      if (wantsImageGeneration(userContent) && !imageDataUrls.length) {
+      if (
+        (parsed.data.forceImage || wantsImageGeneration(userContent)) &&
+        !imageDataUrls.length
+      ) {
         controller.enqueue(
           encoder.encode(
             encodeSse({

@@ -28,6 +28,8 @@ export const chatMessageSchema = z
     locale: z.string().min(2).max(16).optional(),
     pluginId: z.string().min(1).max(64).optional(),
     agentInstructions: z.string().min(1).max(8000).optional(),
+    /** Force image generation for this turn (ChatGem image mode). */
+    forceImage: z.boolean().optional(),
     attachments: z.array(chatAttachmentSchema).max(5).optional(),
   })
   .refine(

@@ -151,6 +151,8 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
   const pluginIdRef = useRef<string | undefined>(pluginFromUrl);
   const agentInstructionsRef = useRef<string | undefined>(undefined);
   const [agentMode, setAgentMode] = useState(false);
+  /** When on, any prompt becomes an image (ChatGPT-style). */
+  const [imageMode, setImageMode] = useState(false);
 
   useEffect(() => {
     let id = pluginFromUrl;
@@ -253,7 +255,10 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
     setBusy(false);
   }
 
-  async function sendPrompt(prompt: string, opts?: { regenerate?: boolean }) {
+  async function sendPrompt(
+    prompt: string,
+    opts?: { regenerate?: boolean; forceImage?: boolean },
+  ) {
     const text = prompt.trim();
     const pendingAttachments = attachments;
     if ((!text && !pendingAttachments.length) || sendingRef.current) return;
@@ -261,6 +266,10 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
     setBusy(true);
     setInput("");
     setAttachments([]);
+
+    const makeImage =
+      (opts?.forceImage || imageMode || wantsImageGeneration(text)) &&
+      !pendingAttachments.length;
 
     const displayText =
       text ||
@@ -306,8 +315,8 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
     abortRef.current = controller;
     let liveChatId = activeChatId ?? chatId;
 
-    // Image generation in chat (DALL·E / Pollinations via /api/images) — ChatGPT-style.
-    if (wantsImageGeneration(text) && !pendingAttachments.length) {
+    // Image generation — mode on, or clear create intent, or regenerate of an image.
+    if (makeImage) {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
@@ -602,14 +611,9 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                   type="button"
                   className="flex items-center gap-3 text-left text-[15px] text-[var(--fg-muted)] transition hover:text-[var(--fg)]"
                   onClick={() => {
-                    setInput(t("chat.createImagePrompt"));
-                    window.setTimeout(() => {
-                      const el = inputRef.current;
-                      if (!el) return;
-                      el.focus();
-                      const len = el.value.length;
-                      el.setSelectionRange(len, len);
-                    }, 0);
+                    setImageMode(true);
+                    setInput("");
+                    window.setTimeout(() => inputRef.current?.focus(), 0);
                   }}
                 >
                   <ImageIcon className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
@@ -740,6 +744,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                               onClick={() =>
                                 void sendPrompt(lastUser.content, {
                                   regenerate: true,
+                                  forceImage: Boolean(message.imageUrl),
                                 })
                               }
                             >
@@ -836,6 +841,22 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
           </div>
         ) : null}
 
+        {imageMode ? (
+          <div className="mx-auto mb-2 flex max-w-3xl items-center justify-between gap-2 rounded-xl bg-[var(--surface-3)] px-3 py-2 text-xs text-[var(--fg-muted)]">
+            <span className="flex items-center gap-1.5">
+              <ImageIcon className="h-3.5 w-3.5 text-[var(--accent)]" />
+              {t("chat.imageModeOn")}
+            </span>
+            <button
+              type="button"
+              className="shrink-0 font-medium text-[var(--accent)] hover:underline"
+              onClick={() => setImageMode(false)}
+            >
+              ✕
+            </button>
+          </div>
+        ) : null}
+
         <div className="mx-auto flex max-w-3xl items-end gap-1 rounded-[1.75rem] border border-[var(--border)] bg-[var(--composer)] px-1.5 py-1.5 shadow-[0_-4px_24px_rgba(0,0,0,0.12)]">
           <input
             ref={fileRef}
@@ -863,11 +884,31 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
           >
             <Plus className="h-5 w-5" />
           </button>
+          <button
+            type="button"
+            className={cn(
+              "grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-[var(--surface-3)]",
+              imageMode
+                ? "bg-[var(--accent)] text-[var(--accent-fg)] hover:bg-[var(--accent)]"
+                : "text-[var(--fg-subtle)]",
+            )}
+            aria-label={t("chat.imageMode")}
+            aria-pressed={imageMode}
+            title={t("chat.createImage")}
+            onClick={() => {
+              setImageMode((v) => !v);
+              window.setTimeout(() => inputRef.current?.focus(), 0);
+            }}
+          >
+            <ImageIcon className="h-5 w-5" strokeWidth={1.75} />
+          </button>
           <Textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={t("chat.placeholder")}
+            placeholder={
+              imageMode ? t("chat.imageModeHint") : t("chat.placeholder")
+            }
             rows={1}
             disabled={busy}
             className="max-h-32 min-h-[44px] flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-base text-[var(--fg)] shadow-none placeholder:text-[var(--fg-subtle)] focus-visible:ring-0 md:text-[15px]"
