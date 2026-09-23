@@ -1,5 +1,11 @@
 /** Shared helpers for ChatGem image / logo generation (ChatGPT-style intents). */
 
+import {
+  buildStrictEnglishPrompt,
+  cleanImageSubject,
+  resolveEnglishSubject,
+} from "@/lib/image-subject";
+
 /** JS `\b` ignores Cyrillic/Tajik — use Unicode letter boundaries instead. */
 const EDGE = String.raw`(?:^|[^\p{L}\p{N}_])`;
 const END = String.raw`(?=[^\p{L}\p{N}_]|$)`;
@@ -54,7 +60,6 @@ export function wantsImageGeneration(text: string) {
 
   if (EXPLICIT_GENERATE_RE.test(t)) return true;
 
-  // Logo requests almost always mean generate.
   if (
     LOGO_RE.test(t) &&
     (CREATE_VERB_RE.test(t) ||
@@ -64,15 +69,12 @@ export function wantsImageGeneration(text: string) {
     return true;
   }
 
-  // “нарисуй …”, “draw a …”, “сурат соз …”, “create an image …”
   if (CREATE_VERB_RE.test(t) && (IMAGE_NOUN_RE.test(t) || LOGO_RE.test(t))) {
     return true;
   }
 
-  // Starts with create/draw even without noun: “draw a red apple” / “нарисуй кота”
   if (STARTS_CREATE_RE.test(t)) return true;
 
-  // Short imperative photo/logo lines: “Сурат соз: себ”
   if (
     t.length < 160 &&
     SHORT_IMAGE_LINE_RE.test(t) &&
@@ -83,11 +85,7 @@ export function wantsImageGeneration(text: string) {
     return true;
   }
 
-  // “хоҳам сурати гул” — want + image noun
-  if (
-    /(?:хоҳам|мехоҳам|хочу|want)/iu.test(t) &&
-    IMAGE_NOUN_RE.test(t)
-  ) {
+  if (/(?:хоҳам|мехоҳам|хочу|want)/iu.test(t) && IMAGE_NOUN_RE.test(t)) {
     return true;
   }
 
@@ -107,43 +105,48 @@ export function extractImagePrompt(text: string) {
     )
     .replace(/(?:^|[^\p{L}\p{N}_])(лагатип|лагтип)(?=[^\p{L}\p{N}_]|$)/giu, " логотип")
     .trim();
-  return cleaned || text.trim();
+  return cleanImageSubject(cleaned || text.trim());
 }
 
-/** Enrich prompt so models produce usable logos / photos. */
+export function detectImageKind(raw: string): "logo" | "photo" | "general" {
+  if (isLogoRequest(raw)) return "logo";
+  if (/фото|photo|photoreal|realistic|снимок|сурат|акс/iu.test(raw)) {
+    return "photo";
+  }
+  return "general";
+}
+
+/** Sync enhance (lexicon only) — prefer enhanceImagePromptAsync in the API. */
 export function enhanceImagePrompt(raw: string): {
   prompt: string;
   kind: "logo" | "photo" | "general";
 } {
+  const kind = detectImageKind(raw);
   const base = extractImagePrompt(raw);
-  if (isLogoRequest(raw) || isLogoRequest(base)) {
-    const subject =
-      base
-        .replace(/логотип|лагатип|лагтип|logo|logotype/giu, "")
-        .replace(/\s+/g, " ")
-        .trim() || "ChatGem AI";
-    return {
-      kind: "logo",
-      prompt: [
-        `Professional app logo design for "${subject}".`,
-        "Clean modern vector-style mark, centered icon, flat or soft gradient,",
-        "high contrast, no tiny unreadable text, no watermark, no mockup frame,",
-        "simple memorable brand symbol, square composition, white or transparent-looking background.",
-      ].join(" "),
-    };
-  }
-  if (
-    /фото|photo|photoreal|realistic|снимок|сурат|акс/iu.test(raw) ||
-    /фото|photo|photoreal|realistic|снимок|сурат|акс/iu.test(base)
-  ) {
-    return {
-      kind: "photo",
-      prompt: `${base}. High quality, detailed, photorealistic when appropriate, sharp focus, natural lighting, no watermark.`,
-    };
-  }
+  const fromLexicon =
+    base
+      .replace(/мошин(?:а|ҳо|и)?/giu, "car")
+      .replace(/машина(?:и|ы|у)?/giu, "car")
+      .replace(/автомобил\w*/giu, "car") || base;
   return {
-    kind: "general",
-    prompt: `${base}. High quality digital art, clear subject, vivid detail, no watermark.`,
+    kind,
+    prompt: buildStrictEnglishPrompt(fromLexicon, kind),
+  };
+}
+
+/** Async: translate TG/RU → English subject, then lock the prompt. */
+export async function enhanceImagePromptAsync(raw: string): Promise<{
+  prompt: string;
+  kind: "logo" | "photo" | "general";
+  subject: string;
+}> {
+  const kind = detectImageKind(raw);
+  const extracted = extractImagePrompt(raw);
+  const subject = await resolveEnglishSubject(extracted || raw);
+  return {
+    kind,
+    subject,
+    prompt: buildStrictEnglishPrompt(subject, kind),
   };
 }
 

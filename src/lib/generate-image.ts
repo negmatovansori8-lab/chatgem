@@ -1,6 +1,13 @@
-import { enhanceImagePrompt } from "@/lib/image-prompt";
+import { enhanceImagePromptAsync } from "@/lib/image-prompt";
 
-export type GenOk = { ok: true; url: string; provider: string; kind: string; prompt: string };
+export type GenOk = {
+  ok: true;
+  url: string;
+  provider: string;
+  kind: string;
+  prompt: string;
+  subject: string;
+};
 export type GenFail = { ok: false; detail: string; status?: number };
 
 async function toDataUrl(bytes: ArrayBuffer, mime = "image/png"): Promise<string> {
@@ -8,7 +15,9 @@ async function toDataUrl(bytes: ArrayBuffer, mime = "image/png"): Promise<string
   return `data:${mime};base64,${b64}`;
 }
 
-async function generateWithOpenAI(prompt: string): Promise<Omit<GenOk, "kind" | "prompt"> | GenFail> {
+async function generateWithOpenAI(
+  prompt: string,
+): Promise<Omit<GenOk, "kind" | "prompt" | "subject"> | GenFail> {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) {
     return { ok: false, detail: "OPENAI_API_KEY missing" };
@@ -86,20 +95,21 @@ async function generateWithOpenAI(prompt: string): Promise<Omit<GenOk, "kind" | 
 async function generateWithPollinations(
   prompt: string,
   kind: "logo" | "photo" | "general",
-): Promise<Omit<GenOk, "kind" | "prompt"> | GenFail> {
-  const encoded = encodeURIComponent(prompt);
+): Promise<Omit<GenOk, "kind" | "prompt" | "subject"> | GenFail> {
+  // Keep prompt short for URL limits; lock subject already in English.
+  const short = prompt.slice(0, 400);
+  const encoded = encodeURIComponent(short);
   const seed = Date.now() % 100000;
-  const style =
-    kind === "logo"
-      ? "&model=flux&style=logo"
-      : kind === "photo"
-        ? "&model=flux"
-        : "&model=flux";
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&enhance=true&seed=${seed}${style}`;
+  // Do NOT use enhance=true — it often ignores the subject and invents faces.
+  const model = kind === "logo" ? "flux" : "flux";
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&nofeed=true&model=${model}&seed=${seed}`;
 
   try {
     const res = await fetch(url, {
-      headers: { Accept: "image/*" },
+      headers: {
+        Accept: "image/*",
+        "User-Agent": "ChatGem/1.0",
+      },
       signal: AbortSignal.timeout(75_000),
     });
     if (!res.ok) {
@@ -129,19 +139,29 @@ export async function generateImageFromPrompt(
   rawPrompt: string,
   kindHint?: "logo" | "photo" | "general" | "auto",
 ): Promise<GenOk | GenFail> {
-  const enhanced = enhanceImagePrompt(rawPrompt);
+  const enhanced = await enhanceImagePromptAsync(rawPrompt);
   const kind =
     kindHint && kindHint !== "auto" ? kindHint : enhanced.kind;
   const prompt = enhanced.prompt;
+  const subject = enhanced.subject;
 
   const openai = await generateWithOpenAI(prompt);
   if (openai.ok) {
-    return { ...openai, kind, prompt };
+    return { ...openai, kind, prompt, subject };
+  }
+
+  // Retry OpenAI with an ultra-short English subject if the long prompt failed.
+  if (subject && subject.length < 120) {
+    const shortPrompt = buildShortRetry(subject, kind);
+    const retry = await generateWithOpenAI(shortPrompt);
+    if (retry.ok) {
+      return { ...retry, kind, prompt: shortPrompt, subject };
+    }
   }
 
   const poll = await generateWithPollinations(prompt, kind);
   if (poll.ok) {
-    return { ...poll, kind, prompt };
+    return { ...poll, kind, prompt, subject };
   }
 
   return {
@@ -149,4 +169,14 @@ export async function generateImageFromPrompt(
     detail: `OpenAI: ${openai.detail}. Fallback: ${poll.detail}`,
     status: "status" in openai ? openai.status : undefined,
   };
+}
+
+function buildShortRetry(
+  subject: string,
+  kind: "logo" | "photo" | "general",
+): string {
+  if (kind === "logo") {
+    return `Simple modern logo for ${subject}, flat vector, no watermark`;
+  }
+  return `A clear photo of ${subject}, main subject only, no people unless requested, no watermark`;
 }
