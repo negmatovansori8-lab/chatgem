@@ -7,13 +7,10 @@ import {
   ArrowUp,
   Copy,
   Download,
-  Globe,
   ImageIcon,
   Mic,
-  Pencil,
   Plus,
   RefreshCw,
-  SpellCheck,
   Square,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
@@ -608,68 +605,37 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                 <p className="text-xs text-[var(--fg-subtle)]">{t("plugins.skillReady")}</p>
               </div>
             ) : (
-              <div className="flex w-full max-w-md flex-col gap-5">
-                <button
-                  type="button"
-                  className="flex items-center gap-3 text-left text-[15px] text-[var(--fg-muted)] transition hover:text-[var(--fg)]"
-                  onClick={() => fileRef.current?.click()}
-                >
-                  <ImageIcon className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
-                  {t("chat.mediaHelper")}
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center gap-3 text-left text-[15px] text-[var(--fg-muted)] transition hover:text-[var(--fg)]"
-                  onClick={() => {
-                    setImageMode(true);
-                    setInput("");
-                    window.setTimeout(() => inputRef.current?.focus(), 0);
-                  }}
-                >
-                  <ImageIcon className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
-                  {t("chat.createImage")}
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center gap-3 text-left text-[15px] text-[var(--fg-muted)] transition hover:text-[var(--fg)]"
-                  onClick={() => {
-                    setInput(t("chat.fixWritingPrompt"));
-                    window.setTimeout(() => {
-                      const el = inputRef.current;
-                      if (!el) return;
-                      el.focus();
-                      const len = el.value.length;
-                      el.setSelectionRange(len, len);
-                    }, 0);
-                  }}
-                >
-                  <SpellCheck className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
-                  {t("chat.fixWriting")}
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center gap-3 text-left text-[15px] text-[var(--fg-muted)] transition hover:text-[var(--fg)]"
-                  onClick={() => {
-                    setInput(t("chat.writeEditPrompt"));
-                    window.setTimeout(() => {
-                      const el = inputRef.current;
-                      if (!el) return;
-                      el.focus();
-                      const len = el.value.length;
-                      el.setSelectionRange(len, len);
-                    }, 0);
-                  }}
-                >
-                  <Pencil className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
-                  {t("chat.writeEdit")}
-                </button>
-                <Link
-                  href="/app/search"
-                  className="flex items-center gap-3 text-[15px] text-[var(--fg-muted)] transition hover:text-[var(--fg)]"
-                >
-                  <Globe className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
-                  {t("chat.searchWeb")}
-                </Link>
+              <div className="mb-auto mt-16 flex w-full max-w-lg flex-col items-center gap-8 px-2">
+                <div className="text-center">
+                  <p className="font-display text-2xl font-semibold tracking-tight text-[var(--fg)] sm:text-3xl">
+                    ChatGem
+                  </p>
+                  <p className="mt-2 text-[15px] text-[var(--fg-muted)]">
+                    {t("chat.askAnything")}
+                  </p>
+                </div>
+                <div className="flex w-full max-w-md flex-col gap-3">
+                  <button
+                    type="button"
+                    className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[15px] text-[var(--fg-muted)] transition hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
+                    onClick={() => {
+                      setImageMode(true);
+                      setInput("");
+                      window.setTimeout(() => inputRef.current?.focus(), 0);
+                    }}
+                  >
+                    <ImageIcon className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
+                    {t("chat.createImage")}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[15px] text-[var(--fg-muted)] transition hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    <Plus className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
+                    {t("chat.mediaHelper")}
+                  </button>
+                </div>
               </div>
             )}
           </div>
