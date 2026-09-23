@@ -1,24 +1,34 @@
 /** Shared helpers for ChatGem image / logo generation (ChatGPT-style intents). */
 
-const LOGO_RE =
-  /логотип|лагатип|лагтип|logotype|\blogo\b|эмблем|брендинг|brand\s*mark|иконк|иконка/i;
+/** JS `\b` ignores Cyrillic/Tajik — use Unicode letter boundaries instead. */
+const EDGE = String.raw`(?:^|[^\p{L}\p{N}_])`;
+const END = String.raw`(?=[^\p{L}\p{N}_]|$)`;
+
+const LOGO_RE = new RegExp(
+  String.raw`логотип|лагатип|лагтип|logotype|${EDGE}logo${END}|эмблем|брендинг|brand\s*mark|иконк`,
+  "iu",
+);
 
 const IMAGE_NOUN_RE =
-  /сурат|тасвир|акс|расм|фото|картинк|изображен|рисунок|снимок|picture|photo|image|illustration|artwork|drawing|снимок|арт\b/i;
+  /сурат|тасвир|акс|расм|фото|картинк|изображен|рисунок|снимок|picture|photo|image|illustration|artwork|drawing|арт(?=[^\p{L}\p{N}_]|$)/iu;
 
 /** Clear “make / draw / generate” verbs (TG / RU / EN). */
-const CREATE_VERB_RE =
-  /(?:^|[\s,])(?:соз(?:ед|ӣ|и)?|сохта\s+диҳ|нарисуй|нарисовать|рисуй|создай|создать|сгенерируй|сгенерировать|сделай|сделать|нарисуйте|хоҳам|мехоҳам|draw|generate|create|make|paint|sketch|render)\b/i;
+const CREATE_VERB_RE = new RegExp(
+  String.raw`${EDGE}(?:соз(?:ед|ӣ|и)?|сохта\s+диҳ|нарисуй(?:те)?|нарисовать|рисуй|создай|создать|сгенерируй|сгенерировать|сделай|сделать|хоҳам|мехоҳам|draw|generate|create|make|paint|sketch|render)${END}`,
+  "iu",
+);
 
 const NEGATIVE_RE =
-  /(?:^|\b)(?:сурат|тасвир|акс|фото|картинк\w*|изображен\w*|image|picture|photo)\s+(?:нест|не\s+вид|не\s+показ|не\s+отображ|не\s+работ)|(?:не\s+(?:вижу|показывает|отображается|работает)\s+(?:сурат|тасвир|акс|фото|картинк|изображен|image|picture|photo))|(?:(?:image|picture|photo|сурат|тасвир)\s+(?:not\s+show|doesn'?t\s+show|isn'?t\s+show|missing|broken|won'?t\s+load))|(?:no\s+image|missing\s+image|broken\s+image|doesn'?t\s+show\s+(?:the\s+)?image)/i;
+  /(?:сурат|тасвир|акс|фото|картинк\p{L}*|изображен\p{L}*|image|picture|photo)\s+(?:нест|не\s+вид|не\s+показ|не\s+отображ|не\s+работ)|(?:не\s+(?:вижу|показывает|отображается|работает)\s+(?:сурат|тасвир|акс|фото|картинк|изображен|image|picture|photo)|(?:image|picture|photo|сурат|тасвир)\s+(?:not\s+show|doesn'?t\s+show|isn'?t\s+show|missing|broken|won'?t\s+load)|(?:no\s+image|missing\s+image|broken\s+image|doesn'?t\s+show\s+(?:the\s+)?image))/iu;
 
 const EXPLICIT_GENERATE_RE =
-  /\b(?:text[\s-]?to[\s-]?image|txt2img|dall-?e|midjourney|stable\s*diffusion)\b/i;
+  /(?:^|[^\p{L}\p{N}_])(?:text[\s-]?to[\s-]?image|txt2img|dall-?e|midjourney|stable\s*diffusion)(?=[^\p{L}\p{N}_]|$)/iu;
 
-/** Phrases like “image of a cat”, “фото кота”, “сурати себ”. */
-const IMAGE_OF_RE =
-  /(?:сурат|тасвир|акс|расм|фото|картинк\w*|изображен\w*|рисунок|picture|photo|image|illustration)\s*(?:и|ии|ы|а|:|of|of\s+a|of\s+an|для|для\s+меня|ман|мехоҳам)?\s+/i;
+const STARTS_CREATE_RE =
+  /^(?:нарисуй(?:те)?|нарисовать|рисуй|создай|сгенерируй|сделай|draw|generate|create|make|paint|sketch|соз|тасвир\s*соз|акс\s*соз|сурат\s*соз|логотип\s*соз)(?=[^\p{L}\p{N}_]|$)/iu;
+
+const SHORT_IMAGE_LINE_RE =
+  /^(?:сурат|тасвир|акс|логотип|лагатип|фото|картинка|изображение|logo)(?=[^\p{L}\p{N}_]|$)/iu;
 
 export function isLogoRequest(text: string) {
   return LOGO_RE.test(text);
@@ -36,7 +46,12 @@ export function wantsImageGeneration(text: string) {
   if (EXPLICIT_GENERATE_RE.test(t)) return true;
 
   // Logo requests almost always mean generate.
-  if (LOGO_RE.test(t) && (CREATE_VERB_RE.test(t) || /[:\-–]|для|for\b|барои/i.test(t) || t.length < 80)) {
+  if (
+    LOGO_RE.test(t) &&
+    (CREATE_VERB_RE.test(t) ||
+      /[:\-–]|для|барои|(?:^|[^\p{L}\p{N}_])for(?=[^\p{L}\p{N}_]|$)/iu.test(t) ||
+      t.length < 80)
+  ) {
     return true;
   }
 
@@ -45,23 +60,24 @@ export function wantsImageGeneration(text: string) {
     return true;
   }
 
-  // Starts with create/draw even without noun: “draw a red apple”
+  // Starts with create/draw even without noun: “draw a red apple” / “нарисуй кота”
+  if (STARTS_CREATE_RE.test(t)) return true;
+
+  // Short imperative photo/logo lines: “Сурат соз: себ”
   if (
-    /^(?:нарисуй|нарисовать|рисуй|создай|сгенерируй|сделай|draw|generate|create|make|paint|sketch|соз|тасвир\s*соз|акс\s*соз|сурат\s*соз|логотип\s*соз)\b/i.test(
+    t.length < 160 &&
+    SHORT_IMAGE_LINE_RE.test(t) &&
+    /[:\-–]|соз|создай|сделай|generate|create|draw|барои|для|(?:^|[^\p{L}\p{N}_])for(?=[^\p{L}\p{N}_]|$)/iu.test(
       t,
     )
   ) {
     return true;
   }
 
-  // “image of …”, “фото …”, “сурати …”
-  if (IMAGE_OF_RE.test(t) && CREATE_VERB_RE.test(t)) return true;
-
-  // Short imperative photo/logo lines
+  // “хоҳам сурати гул” — want + image noun
   if (
-    t.length < 160 &&
-    /^(?:сурат|тасвир|акс|логотип|лагатип|фото|картинка|изображение|logo)\b/i.test(t) &&
-    /[:\-–]|соз|создай|сделай|generate|create|draw|for\b|барои|для/i.test(t)
+    /(?:хоҳам|мехоҳам|хочу|want)/iu.test(t) &&
+    IMAGE_NOUN_RE.test(t)
   ) {
     return true;
   }
@@ -73,14 +89,14 @@ export function extractImagePrompt(text: string) {
   const cleaned = text
     .trim()
     .replace(
-      /^(пожалуйста[,.]?\s*|please[,.]?\s*|ман\s+мехоҳам\s+(ки\s+)?|мехоҳам\s+(ки\s+)?|хоҳам\s+(ки\s+)?|can\s+you\s+|could\s+you\s+|please\s+)/i,
+      /^(пожалуйста[,.]?\s*|please[,.]?\s*|ман\s+мехоҳам\s+(ки\s+)?|мехоҳам\s+(ки\s+)?|хоҳам\s+(ки\s+)?|can\s+you\s+|could\s+you\s+|please\s+)/iu,
       "",
     )
     .replace(
-      /^(нарисуй(?:те)?|нарисовать|рисуй|создай\s+изображение|создай\s+картинку|создай\s+фото|создай\s+логотип|создай\s+лагатип|сгенерируй\s+изображение|сгенерируй\s+картинку|сделай\s+логотип|сделай\s+картинку|сделай\s+фото|сделай\s+изображение|generate\s+an?\s+image\s+of|generate\s+a\s+photo\s+of|generate\s+image|generate\s+a\s+logo|create\s+an?\s+image\s+of|create\s+a\s+photo\s+of|create\s+an?\s+image|create\s+a\s+logo|draw\s+(?:me\s+)?(?:an?\s+)?(?:image\s+of\s+)?|make\s+(?:me\s+)?(?:an?\s+)?(?:image\s+of\s+)?|paint|sketch|тасвир\s*соз|акс\s*соз|сурат\s*соз|логотип\s*соз|лагатип\s*соз|лагтип\s*соз|соз)[:\s-]*/i,
+      /^(нарисуй(?:те)?|нарисовать|рисуй|создай\s+изображение|создай\s+картинку|создай\s+фото|создай\s+логотип|создай\s+лагатип|сгенерируй\s+изображение|сгенерируй\s+картинку|сделай\s+логотип|сделай\s+картинку|сделай\s+фото|сделай\s+изображение|generate\s+an?\s+image\s+of|generate\s+a\s+photo\s+of|generate\s+image|generate\s+a\s+logo|create\s+an?\s+image\s+of|create\s+a\s+photo\s+of|create\s+an?\s+image|create\s+a\s+logo|draw\s+(?:me\s+)?(?:an?\s+)?(?:image\s+of\s+)?|make\s+(?:me\s+)?(?:an?\s+)?(?:image\s+of\s+)?|paint|sketch|тасвир\s*соз|акс\s*соз|сурат\s*соз|логотип\s*соз|лагатип\s*соз|лагтип\s*соз|соз)[:\s-]*/iu,
       "",
     )
-    .replace(/\b(лагатип|лагтип)\b/gi, "логотип")
+    .replace(/(?:^|[^\p{L}\p{N}_])(лагатип|лагтип)(?=[^\p{L}\p{N}_]|$)/giu, " логотип")
     .trim();
   return cleaned || text.trim();
 }
@@ -94,7 +110,7 @@ export function enhanceImagePrompt(raw: string): {
   if (isLogoRequest(raw) || isLogoRequest(base)) {
     const subject =
       base
-        .replace(/\b(логотип|лагатип|лагтип|logo|logotype)\b/gi, "")
+        .replace(/логотип|лагатип|лагтип|logo|logotype/giu, "")
         .replace(/\s+/g, " ")
         .trim() || "ChatGem AI";
     return {
@@ -108,8 +124,8 @@ export function enhanceImagePrompt(raw: string): {
     };
   }
   if (
-    /фото|photo|photoreal|realistic|снимок|сурат|акс/i.test(raw) ||
-    /фото|photo|photoreal|realistic|снимок|сурат|акс/i.test(base)
+    /фото|photo|photoreal|realistic|снимок|сурат|акс/iu.test(raw) ||
+    /фото|photo|photoreal|realistic|снимок|сурат|акс/iu.test(base)
   ) {
     return {
       kind: "photo",
