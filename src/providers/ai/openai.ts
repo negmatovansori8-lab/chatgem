@@ -29,10 +29,10 @@ async function* streamCompatible(
     body: JSON.stringify({
       model,
       stream: true,
-      temperature: input.temperature ?? 0.2,
-      max_tokens: input.maxTokens ?? 2048,
-      frequency_penalty: 0.15,
-      presence_penalty: 0.1,
+      temperature: input.temperature ?? 0.45,
+      max_tokens: input.maxTokens ?? 4096,
+      frequency_penalty: 0.2,
+      presence_penalty: 0.15,
       messages: input.messages,
     }),
   });

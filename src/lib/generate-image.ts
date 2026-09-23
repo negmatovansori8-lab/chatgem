@@ -17,25 +17,37 @@ async function toDataUrl(bytes: ArrayBuffer, mime = "image/png"): Promise<string
 
 async function generateWithOpenAI(
   prompt: string,
+  kind: "logo" | "photo" | "general",
 ): Promise<Omit<GenOk, "kind" | "prompt" | "subject"> | GenFail> {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) {
     return { ok: false, detail: "OPENAI_API_KEY missing" };
   }
 
+  // World-class path: DALL·E 3 HD first, then standard, then DALL·E 2.
+  const style = kind === "photo" ? "natural" : "vivid";
   const attempts: Array<Record<string, unknown>> = [
     {
       model: "dall-e-3",
-      prompt,
+      prompt: prompt.slice(0, 3900),
+      n: 1,
+      size: "1024x1024",
+      quality: "hd",
+      style,
+    },
+    {
+      model: "dall-e-3",
+      prompt: prompt.slice(0, 3900),
       n: 1,
       size: "1024x1024",
       quality: "standard",
+      style,
     },
     {
       model: "dall-e-2",
-      prompt,
+      prompt: prompt.slice(0, 900),
       n: 1,
-      size: "512x512",
+      size: "1024x1024",
     },
   ];
 
@@ -75,7 +87,7 @@ async function generateWithOpenAI(
           const buf = await img.arrayBuffer();
           return {
             ok: true,
-            provider: String(body.model),
+            provider: `${String(body.model)}${body.quality === "hd" ? "-hd" : ""}`,
             url: await toDataUrl(
               buf,
               img.headers.get("content-type") || "image/png",
@@ -96,13 +108,12 @@ async function generateWithPollinations(
   prompt: string,
   kind: "logo" | "photo" | "general",
 ): Promise<Omit<GenOk, "kind" | "prompt" | "subject"> | GenFail> {
-  // Keep prompt short for URL limits; lock subject already in English.
-  const short = prompt.slice(0, 400);
+  const short = prompt.slice(0, 450);
   const encoded = encodeURIComponent(short);
   const seed = Date.now() % 100000;
-  // Do NOT use enhance=true — it often ignores the subject and invents faces.
+  // Flux at 1024 — no enhance (it invents faces). Prefer turbo for speed/quality mix.
   const model = kind === "logo" ? "flux" : "flux";
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&nofeed=true&model=${model}&seed=${seed}`;
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1280&height=1280&nologo=true&nofeed=true&model=${model}&seed=${seed}`;
 
   try {
     const res = await fetch(url, {
@@ -110,7 +121,7 @@ async function generateWithPollinations(
         Accept: "image/*",
         "User-Agent": "ChatGem/1.0",
       },
-      signal: AbortSignal.timeout(75_000),
+      signal: AbortSignal.timeout(90_000),
     });
     if (!res.ok) {
       return { ok: false, detail: `Pollinations HTTP ${res.status}` };
@@ -122,7 +133,7 @@ async function generateWithPollinations(
     const mime = res.headers.get("content-type") || "image/jpeg";
     return {
       ok: true,
-      provider: "pollinations",
+      provider: "pollinations-flux",
       url: await toDataUrl(buf, mime),
     };
   } catch (error) {
@@ -145,15 +156,17 @@ export async function generateImageFromPrompt(
   const prompt = enhanced.prompt;
   const subject = enhanced.subject;
 
-  const openai = await generateWithOpenAI(prompt);
+  const openai = await generateWithOpenAI(prompt, kind);
   if (openai.ok) {
     return { ...openai, kind, prompt, subject };
   }
 
-  // Retry OpenAI with an ultra-short English subject if the long prompt failed.
   if (subject && subject.length < 120) {
-    const shortPrompt = buildShortRetry(subject, kind);
-    const retry = await generateWithOpenAI(shortPrompt);
+    const shortPrompt =
+      kind === "logo"
+        ? `Award-winning minimal logo for ${subject}, vector, flat, no watermark`
+        : `World-class photorealistic image of ${subject}, cinematic lighting, 8K detail, subject must be ${subject}, no people unless requested, no watermark`;
+    const retry = await generateWithOpenAI(shortPrompt, kind);
     if (retry.ok) {
       return { ...retry, kind, prompt: shortPrompt, subject };
     }
@@ -169,14 +182,4 @@ export async function generateImageFromPrompt(
     detail: `OpenAI: ${openai.detail}. Fallback: ${poll.detail}`,
     status: "status" in openai ? openai.status : undefined,
   };
-}
-
-function buildShortRetry(
-  subject: string,
-  kind: "logo" | "photo" | "general",
-): string {
-  if (kind === "logo") {
-    return `Simple modern logo for ${subject}, flat vector, no watermark`;
-  }
-  return `A clear photo of ${subject}, main subject only, no people unless requested, no watermark`;
 }

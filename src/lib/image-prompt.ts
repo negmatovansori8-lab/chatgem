@@ -3,6 +3,7 @@
 import {
   buildStrictEnglishPrompt,
   cleanImageSubject,
+  enrichWorldClassBrief,
   resolveEnglishSubject,
 } from "@/lib/image-subject";
 
@@ -134,7 +135,7 @@ export function enhanceImagePrompt(raw: string): {
   };
 }
 
-/** Async: translate TG/RU → English subject, then lock the prompt. */
+/** Async: translate TG/RU → English subject, then lock a world-class prompt. */
 export async function enhanceImagePromptAsync(raw: string): Promise<{
   prompt: string;
   kind: "logo" | "photo" | "general";
@@ -143,10 +144,11 @@ export async function enhanceImagePromptAsync(raw: string): Promise<{
   const kind = detectImageKind(raw);
   const extracted = extractImagePrompt(raw);
   const subject = await resolveEnglishSubject(extracted || raw);
+  const prompt = await enrichWorldClassBrief(subject, kind);
   return {
     kind,
     subject,
-    prompt: buildStrictEnglishPrompt(subject, kind),
+    prompt,
   };
 }
 

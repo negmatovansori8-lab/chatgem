@@ -160,8 +160,9 @@ export async function* streamChatCompletion(input: {
   ];
 
   const isPro = await subscriptionRepository.isProOrBetter(input.userId);
-  const temperature = 0.25;
-  const maxTokens = isPro ? 4096 : 3000;
+  // World-class replies: enough room + natural ChatGPT-like tone
+  const temperature = 0.45;
+  const maxTokens = isPro ? 8192 : 4500;
 
   let lastError = "";
 

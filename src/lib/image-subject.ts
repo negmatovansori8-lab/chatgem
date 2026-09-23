@@ -66,7 +66,7 @@ export function lexiconToEnglish(text: string): string {
 
 /**
  * Build a strict English prompt that locks the subject.
- * Models (esp. Pollinations) ignore vague TG/RU and invent faces.
+ * World-class photography / design language for DALL·E / Flux.
  */
 export function buildStrictEnglishPrompt(
   subjectEn: string,
@@ -74,32 +74,105 @@ export function buildStrictEnglishPrompt(
 ): string {
   const subject = subjectEn.trim() || "the requested subject";
   const lock = [
-    `Create exactly this subject: ${subject}.`,
-    `The main focus MUST be: ${subject}.`,
-    "Do not replace the subject with a different object or a random person.",
-    "No watermark, no logo overlay, no text unless the subject is a logo.",
+    `Subject (mandatory, do not change): ${subject}.`,
+    `Depict ONLY ${subject} as the clear main focus.`,
+    "Do not replace with a different object or a random person.",
+    "No watermark, no UI chrome, no stock-photo logo, no text overlays.",
   ];
 
   if (kind === "logo") {
     return [
-      `Professional app logo for "${subject}".`,
-      "Clean modern vector-style mark, centered icon, flat or soft gradient,",
-      "high contrast, simple memorable brand symbol, square composition,",
-      "plain background, no mockup frame, no watermark, no tiny unreadable text.",
+      `Award-winning app logo design for "${subject}".`,
+      "Clean modern vector mark, memorable icon, balanced negative space,",
+      "premium flat or soft gradient, high contrast, square composition,",
+      "plain light background, no mockup, no 3D phone frame, no tiny unreadable text, no watermark.",
     ].join(" ");
   }
 
   if (kind === "photo") {
     return [
       ...lock,
-      `Photorealistic photograph of ${subject}, sharp focus, natural lighting, detailed, high quality.`,
+      `Ultra-realistic photograph of ${subject},`,
+      "shot on full-frame camera, 85mm lens look, shallow depth of field when suitable,",
+      "cinematic natural lighting, rich color, razor-sharp detail, 8K clarity,",
+      "professional composition, magazine quality, no blurry faces unless asked.",
     ].join(" ");
   }
 
   return [
     ...lock,
-    `High quality detailed image of ${subject}, clear composition, vivid detail.`,
+    `Premium high-end digital artwork of ${subject},`,
+    "masterful composition, vivid detail, beautiful lighting, polished finish,",
+    "looks like a top AI art showcase piece, no watermark.",
   ].join(" ");
+}
+
+/** LLM expands a short subject into a world-class DALL·E brief (English). */
+export async function enrichWorldClassBrief(
+  subject: string,
+  kind: "logo" | "photo" | "general",
+): Promise<string> {
+  const base = buildStrictEnglishPrompt(subject, kind);
+  const openai = process.env.OPENAI_API_KEY?.trim();
+  const groq = process.env.GROQ_API_KEY?.trim();
+  if (!openai && !groq) return base;
+
+  const system = [
+    "You write world-class prompts for DALL·E 3 / Flux.",
+    "Output ONLY one English image prompt (max 320 characters).",
+    "Keep the EXACT subject the user asked for — never swap it for a person unless they asked for a person.",
+    "Add professional photography/design details: lighting, lens, composition, material, atmosphere.",
+    "No watermark, no text overlays unless logo lettering is requested.",
+  ].join("\n");
+
+  const user = `Kind: ${kind}. Subject: ${subject}`;
+
+  const endpoints = [
+    openai && {
+      url: "https://api.openai.com/v1/chat/completions",
+      key: openai,
+      model: "gpt-4o-mini",
+    },
+    groq && {
+      url: "https://api.groq.com/openai/v1/chat/completions",
+      key: groq,
+      model: "llama-3.1-8b-instant",
+    },
+  ].filter(Boolean) as Array<{ url: string; key: string; model: string }>;
+
+  for (const a of endpoints) {
+    try {
+      const res = await fetch(a.url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${a.key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: a.model,
+          temperature: 0.4,
+          max_tokens: 180,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) continue;
+      const data = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const text = data.choices?.[0]?.message?.content?.trim();
+      if (text && text.length > 20 && text.length < 900) {
+        // Re-lock subject in case the model drifted
+        return `${text.replace(/^["']|["']$/g, "").trim()} Subject must be: ${subject}. No watermark.`;
+      }
+    } catch {
+      // next
+    }
+  }
+  return base;
 }
 
 async function llmTranslateToEnglish(subject: string): Promise<string | null> {
