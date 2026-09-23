@@ -132,7 +132,20 @@ export function GalleryWorkspace() {
         // ignore
       }
     }
-    setMessage(data.message ?? t("gallery.done"));
+    setMessage(
+      typeof data.message === "string"
+        ? data.message
+        : t("gallery.done"),
+    );
+    if (data.openaiError?.detail) {
+      const detail =
+        typeof data.openaiError.detail === "string"
+          ? data.openaiError.detail.slice(0, 180)
+          : "";
+      if (detail) {
+        setMessage((prev) => `${prev ?? ""}\nOpenAI: ${detail}`);
+      }
+    }
   }
 
   function onSubmit(e: FormEvent) {
