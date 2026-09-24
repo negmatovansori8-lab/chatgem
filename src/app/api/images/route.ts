@@ -45,6 +45,7 @@ export async function POST(request: Request) {
     url: result.url,
     prompt: result.prompt,
     subject: result.subject,
+    warning: "warning" in result ? result.warning : undefined,
     captionKey:
       kind === "logo" ? "logoReady" : kind === "photo" ? "photoReady" : "imageReady",
     message:

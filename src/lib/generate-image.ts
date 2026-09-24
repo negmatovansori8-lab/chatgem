@@ -7,6 +7,7 @@ export type GenOk = {
   kind: string;
   prompt: string;
   subject: string;
+  warning?: string;
 };
 export type GenFail = { ok: false; detail: string; status?: number };
 
@@ -15,16 +16,19 @@ async function toDataUrl(bytes: ArrayBuffer, mime = "image/png"): Promise<string
   return `data:${mime};base64,${b64}`;
 }
 
+function openaiKey() {
+  return process.env.OPENAI_API_KEY?.trim() || "";
+}
+
 async function generateWithOpenAI(
   prompt: string,
   kind: "logo" | "photo" | "general",
 ): Promise<Omit<GenOk, "kind" | "prompt" | "subject"> | GenFail> {
-  const key = process.env.OPENAI_API_KEY?.trim();
+  const key = openaiKey();
   if (!key) {
-    return { ok: false, detail: "OPENAI_API_KEY missing" };
+    return { ok: false, detail: "OPENAI_API_KEY missing on server" };
   }
 
-  // World-class path: DALL·E 3 HD first, then standard, then DALL·E 2.
   const style = kind === "photo" ? "natural" : "vivid";
   const attempts: Array<Record<string, unknown>> = [
     {
@@ -66,7 +70,7 @@ async function generateWithOpenAI(
     const raw = await res.text().catch(() => "");
     if (!res.ok) {
       lastStatus = res.status;
-      lastDetail = raw.slice(0, 300) || `HTTP ${res.status}`;
+      lastDetail = raw.slice(0, 400) || `HTTP ${res.status}`;
       continue;
     }
     try {
@@ -104,16 +108,42 @@ async function generateWithOpenAI(
   return { ok: false, detail: lastDetail, status: lastStatus };
 }
 
+/** Short locked prompt — Flux ignores long essays and invents phones/faces. */
+function pollinationsPrompt(
+  subject: string,
+  kind: "logo" | "photo" | "general",
+): string {
+  const s = subject.trim() || "the subject";
+  if (kind === "logo") {
+    return [
+      `simple modern app logo icon of ${s}`,
+      `flat vector, centered, square, plain white background`,
+      `sharp, high contrast, no phone, no mockup, no person, no watermark, no text blur`,
+    ].join(", ");
+  }
+  if (kind === "photo") {
+    return [
+      `sharp photorealistic photo of ${s}`,
+      `main subject clearly visible and in focus`,
+      `natural light, detailed, no phone screen, no mockup frame, no watermark, no blurry mess`,
+    ].join(", ");
+  }
+  return [
+    `clear detailed image of ${s}`,
+    `subject fills the frame, sharp focus`,
+    `no phone, no mockup, no random person, no watermark`,
+  ].join(", ");
+}
+
 async function generateWithPollinations(
-  prompt: string,
+  subject: string,
   kind: "logo" | "photo" | "general",
 ): Promise<Omit<GenOk, "kind" | "prompt" | "subject"> | GenFail> {
-  const short = prompt.slice(0, 450);
-  const encoded = encodeURIComponent(short);
+  const prompt = pollinationsPrompt(subject, kind);
+  const encoded = encodeURIComponent(prompt);
   const seed = Date.now() % 100000;
-  // Flux at 1024 — no enhance (it invents faces). Prefer turbo for speed/quality mix.
-  const model = kind === "logo" ? "flux" : "flux";
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1280&height=1280&nologo=true&nofeed=true&model=${model}&seed=${seed}`;
+  // Keep prompt short; nologo=true; private to reduce feed defaults.
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&private=true&nofeed=true&model=flux&seed=${seed}`;
 
   try {
     const res = await fetch(url, {
@@ -127,7 +157,7 @@ async function generateWithPollinations(
       return { ok: false, detail: `Pollinations HTTP ${res.status}` };
     }
     const buf = await res.arrayBuffer();
-    if (buf.byteLength < 1000) {
+    if (buf.byteLength < 2000) {
       return { ok: false, detail: "Pollinations returned empty image" };
     }
     const mime = res.headers.get("content-type") || "image/jpeg";
@@ -135,6 +165,8 @@ async function generateWithPollinations(
       ok: true,
       provider: "pollinations-flux",
       url: await toDataUrl(buf, mime),
+      warning:
+        "Сифати ройгон (Pollinations). Барои сурати HD дар Render OPENAI_API_KEY + пул гузоред.",
     };
   } catch (error) {
     return {
@@ -143,6 +175,23 @@ async function generateWithPollinations(
         error instanceof Error ? error.message : "Pollinations fetch failed",
     };
   }
+}
+
+function friendlyOpenAIFail(detail: string): string {
+  const d = detail.toLowerCase();
+  if (/missing/.test(d)) {
+    return "OPENAI_API_KEY дар Render нест. Environment → илова кунед.";
+  }
+  if (/insufficient_quota|billing|credit|exceeded/.test(d)) {
+    return "Пули OpenAI тамом шуд — platform.openai.com → Billing.";
+  }
+  if (/401|invalid.?api|incorrect.?api/.test(d)) {
+    return "OPENAI_API_KEY нодуруст аст.";
+  }
+  if (/429|rate.?limit/.test(d)) {
+    return "Лимити OpenAI пур шуд — як дақиқа интизор шавед.";
+  }
+  return detail.slice(0, 200);
 }
 
 /** Shared image pipeline for /api/images and chat intercept. */
@@ -164,22 +213,28 @@ export async function generateImageFromPrompt(
   if (subject && subject.length < 120) {
     const shortPrompt =
       kind === "logo"
-        ? `Award-winning minimal logo for ${subject}, vector, flat, no watermark`
-        : `World-class photorealistic image of ${subject}, cinematic lighting, 8K detail, subject must be ${subject}, no people unless requested, no watermark`;
+        ? `Simple modern logo icon for ${subject}, flat vector, white background, no mockup, no phone, no watermark`
+        : `Sharp clear photo of ${subject} only, in focus, no phone mockup, no watermark`;
     const retry = await generateWithOpenAI(shortPrompt, kind);
     if (retry.ok) {
       return { ...retry, kind, prompt: shortPrompt, subject };
     }
   }
 
-  const poll = await generateWithPollinations(prompt, kind);
+  const poll = await generateWithPollinations(subject, kind);
   if (poll.ok) {
-    return { ...poll, kind, prompt, subject };
+    return {
+      ...poll,
+      kind,
+      prompt: pollinationsPrompt(subject, kind),
+      subject,
+      warning: `${poll.warning ?? ""} OpenAI: ${friendlyOpenAIFail(openai.detail)}`.trim(),
+    };
   }
 
   return {
     ok: false,
-    detail: `OpenAI: ${openai.detail}. Fallback: ${poll.detail}`,
+    detail: `Сурат сохта нашуд. ${friendlyOpenAIFail(openai.detail)} / ${poll.detail}`,
     status: "status" in openai ? openai.status : undefined,
   };
 }

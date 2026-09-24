@@ -344,6 +344,8 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
           prompt?: string;
           captionKey?: string;
           message?: string;
+          warning?: string;
+          provider?: string;
           error?: { message?: string };
         };
         if (!res.ok || typeof data.url !== "string") {
@@ -368,6 +370,9 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
               : data.kind === "photo"
                 ? t("chat.photoReady")
                 : t("chat.imageReady");
+          const note = data.warning?.trim()
+            ? `${caption}\n\n_${data.warning}_`
+            : caption;
           saveGeneratedImageToLibrary(data.url, data.prompt || text);
           setMessages((prev) =>
             prev.map((m) =>
@@ -376,7 +381,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                     ...m,
                     pending: false,
                     imageUrl: data.url,
-                    content: caption,
+                    content: note,
                   }
                 : m,
             ),
