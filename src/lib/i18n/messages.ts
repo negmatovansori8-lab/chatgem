@@ -69,7 +69,7 @@ export const en: Dictionary = {
     "I want to start my business next week and need help with planning.",
   "landing.pricing.title": "Simple plans",
   "landing.pricing.subtitle":
-    "Start free. Upgrade to Pro when you want stronger answers — Visa checkout when payment is configured.",
+    "Sign in. Upgrade to Pro when you want stronger answers — Visa checkout when payment is configured.",
   "landing.pricing.popular": "Popular",
   "landing.faq.title": "Straight answers",
   "landing.faq.subtitle": "No fluff — only what actually works today.",
@@ -523,7 +523,7 @@ export const overlays: Record<string, Partial<Dictionary>> = {
       "Я хочу начать бизнес на следующей неделе и мне нужна помощь с планом.",
     "landing.pricing.title": "Простые тарифы",
     "landing.pricing.subtitle":
-      "Начните бесплатно. Pro — когда нужны более сильные ответы. Visa при настроенной оплате.",
+      "Войдите. Pro — когда нужны более сильные ответы. Visa при настроенной оплате.",
     "landing.pricing.popular": "Популярный",
     "landing.faq.title": "Прямые ответы",
     "landing.faq.subtitle": "Без воды — только то, что работает сегодня.",
@@ -976,7 +976,7 @@ export const overlays: Record<string, Partial<Dictionary>> = {
       "Ман мехоҳам бизнес оғоз кунам ва ба ман ёрдам лозим аст.",
     "landing.pricing.title": "Нархҳои содда",
     "landing.pricing.subtitle":
-      "Ройгон оғоз кунед. Pro — вақте ҷавобҳои қавитар лозим аст. Visa ҳангоми танзими пардохт.",
+      "Ворид шавед. Pro — вақте ҷавобҳои қавитар лозим аст. Visa ҳангоми танзими пардохт.",
     "landing.pricing.popular": "Маъмул",
     "landing.faq.title": "Ҷавобҳои равшан",
     "landing.faq.subtitle": "Бе ваъдаҳои холӣ — танҳо он чизе ки имрӯз кор мекунад.",

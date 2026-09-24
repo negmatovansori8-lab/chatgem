@@ -55,7 +55,7 @@ export const plans = [
       "Google sign-in & full workspace",
       "No feature locks on Free",
     ],
-    cta: "Start Free",
+    cta: "Sign in",
     highlighted: false,
   },
   {
