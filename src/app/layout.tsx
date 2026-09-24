@@ -41,8 +41,11 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    icon: [{ url: "/chatgem-logo.png", type: "image/png" }],
-    apple: [{ url: "/chatgem-logo.png", type: "image/png" }],
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: [{ url: "/favicon-32.png", type: "image/png" }],
   },
 };
 
