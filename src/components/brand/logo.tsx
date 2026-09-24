@@ -6,12 +6,18 @@ import { cn } from "@/lib/utils";
 export function Logo({
   className,
   href = "/",
-  showWordmark = true,
+  /** Extra text beside logo — off by default (PNG already says ChatGem). */
+  showWordmark = false,
+  size = "md",
 }: {
   className?: string;
   href?: string;
   showWordmark?: boolean;
+  size?: "sm" | "md" | "lg";
 }) {
+  const box =
+    size === "lg" ? "h-12 w-12" : size === "sm" ? "h-8 w-8" : "h-9 w-9";
+
   return (
     <Link
       href={href}
@@ -21,21 +27,26 @@ export function Logo({
       )}
       aria-label={`${brand.name} home`}
     >
-      <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl shadow-[0_8px_24px_-10px_var(--accent-glow)]">
+      <span
+        className={cn(
+          "relative shrink-0 overflow-hidden rounded-xl bg-black shadow-[0_8px_24px_-10px_var(--accent-glow)]",
+          box,
+        )}
+      >
         <Image
           src="/chatgem-logo.png"
-          alt=""
-          width={72}
-          height={72}
-          className="h-full w-full object-contain"
+          alt={brand.name}
+          width={96}
+          height={96}
+          className="h-full w-full object-cover object-top"
           priority
         />
       </span>
       {showWordmark ? (
         <span className="font-[family-name:var(--font-display)] text-[15px] font-bold tracking-tight text-[var(--fg)]">
-          <span className="text-[var(--fg)]">CHAT</span>
-          <span className="bg-gradient-to-r from-[#2563EB] to-[#7C3AED] bg-clip-text text-transparent">
-            GEM
+          <span className="text-[var(--fg)]">Chat</span>
+          <span className="bg-gradient-to-r from-[#22D3EE] via-[#3B82F6] to-[#C026F3] bg-clip-text text-transparent">
+            Gem
           </span>
         </span>
       ) : null}
