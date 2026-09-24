@@ -19,6 +19,11 @@ function ProviderIcon({ id }: { id: string }) {
           fill="#EA4335"
           d="M12 10.2v3.6h5.1c-.2 1.2-1.5 3.6-5.1 3.6-3.1 0-5.6-2.5-5.6-5.6S8.9 6.2 12 6.2c1.8 0 3 .7 3.7 1.4l2.5-2.5C16.7 3.7 14.6 2.8 12 2.8 6.9 2.8 2.8 6.9 2.8 12S6.9 21.2 12 21.2c5.2 0 8.6-3.6 8.6-8.7 0-.6-.1-1-.2-1.5H12z"
         />
+        <path
+          fill="#4285F4"
+          d="M23.5 12.2c0-.7-.1-1.4-.2-2H12v3.8h6.5c-.3 1.5-1.2 2.8-2.5 3.6v3h4c2.3-2.1 3.5-5.2 3.5-8.4z"
+          opacity="0"
+        />
       </svg>
     );
   }
@@ -32,26 +37,32 @@ function ProviderIcon({ id }: { id: string }) {
   return null;
 }
 
-/** Cursor Simple Browser / Electron → Google returns Error 400. */
-function isEmbeddedIdeBrowser() {
+/** Only Cursor/VS Code Electron — NOT Mobile Preview iframes. */
+function isCursorElectron() {
   if (typeof window === "undefined") return false;
   const ua = navigator.userAgent || "";
-  if (/Electron|Cursor\/|VSCodium|Code\/1\d/i.test(ua)) return true;
-  try {
-    if (window.self !== window.top) return true;
-  } catch {
-    return true;
-  }
-  return false;
+  return /Electron|Cursor\/|VSCodium|Code\/1\d/i.test(ua);
 }
 
-async function openInSystemBrowser(path: "/login" | "/api/auth/oauth/google") {
+async function openGoogleInChrome() {
   const res = await fetch("/api/auth/open-browser", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path }),
+    body: JSON.stringify({ path: "/api/auth/oauth/google" }),
   });
   if (!res.ok) throw new Error("open failed");
+}
+
+function goToOAuth(authUrl: string) {
+  try {
+    if (window.top && window.top !== window.self) {
+      window.top.location.assign(authUrl);
+      return;
+    }
+  } catch {
+    // cross-origin frame — fall through
+  }
+  window.location.assign(authUrl);
 }
 
 export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" }) {
@@ -59,8 +70,6 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" }
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-  const embedded = isEmbeddedIdeBrowser();
 
   useEffect(() => {
     let cancelled = false;
@@ -82,75 +91,46 @@ export function OAuthButtons({ mode = "login" }: { mode?: "login" | "register" }
 
   if (!loaded || providers.length === 0) return null;
 
+  async function onProviderClick(provider: Provider) {
+    if (provider.id === "google" && isCursorElectron()) {
+      setBusy(true);
+      try {
+        await openGoogleInChrome();
+      } catch {
+        window.open(
+          `${window.location.origin}/api/auth/oauth/google`,
+          "_blank",
+          "noopener,noreferrer",
+        );
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    goToOAuth(provider.authUrl);
+  }
+
   return (
     <div className="space-y-3">
-      <p className="text-center text-xs font-semibold uppercase tracking-[0.16em] text-white/35">
+      <p className="text-center text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fg-subtle)]">
         {mode === "login" ? t("auth.continueWith") : t("auth.signupWith")}
       </p>
 
-      {embedded ? (
-        <div className="space-y-2 rounded-2xl border border-amber-500/35 bg-amber-500/10 p-3">
-          <p className="text-center text-[12px] leading-relaxed text-amber-50/95">
-            {t("auth.googleCursorBlock")}
-          </p>
+      <div className="grid gap-2">
+        {providers.map((provider) => (
           <Button
+            key={provider.id}
             type="button"
-            disabled={busy}
-            className="w-full rounded-full bg-white text-black hover:bg-white/90"
-            onClick={() => {
-              setBusy(true);
-              setNote(null);
-              void openInSystemBrowser("/api/auth/oauth/google")
-                .then(() => setNote(t("auth.chromeOpened")))
-                .catch(() => setNote(t("auth.chromeOpenFail")))
-                .finally(() => setBusy(false));
-            }}
+            variant="secondary"
+            disabled={busy && provider.id === "google"}
+            className="w-full justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] hover:bg-[var(--surface-2)]"
+            onClick={() => void onProviderClick(provider)}
           >
-            {busy ? t("common.loading") : t("auth.openChromeGoogle")}
+            <ProviderIcon id={provider.id} />
+            {provider.name}
           </Button>
-          {note ? (
-            <p className="text-center text-[11px] text-white/55">{note}</p>
-          ) : null}
-        </div>
-      ) : null}
-
-      {!embedded ? (
-        <div className="grid gap-2">
-          {providers.map((provider) => (
-            <Button
-              key={provider.id}
-              type="button"
-              variant="secondary"
-              className="w-full justify-center rounded-full border-white/10 bg-white/5 text-white hover:bg-white/10"
-              onClick={() => {
-                window.location.assign(provider.authUrl);
-              }}
-            >
-              <ProviderIcon id={provider.id} />
-              {provider.name}
-            </Button>
-          ))}
-        </div>
-      ) : (
-        <div className="grid gap-2 opacity-50">
-          {providers.map((provider) => (
-            <Button
-              key={provider.id}
-              type="button"
-              variant="secondary"
-              disabled={provider.id === "google"}
-              className="w-full justify-center rounded-full border-white/10 bg-white/5 text-white"
-              onClick={() => {
-                if (provider.id === "google") return;
-                window.location.assign(provider.authUrl);
-              }}
-            >
-              <ProviderIcon id={provider.id} />
-              {provider.name}
-            </Button>
-          ))}
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
