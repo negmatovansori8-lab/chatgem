@@ -150,6 +150,86 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
   const [agentMode, setAgentMode] = useState(false);
   /** When on, any prompt becomes an image (ChatGPT-style). */
   const [imageMode, setImageMode] = useState(false);
+  const [micListening, setMicListening] = useState(false);
+  const micRecRef = useRef<{ stop: () => void } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      try {
+        micRecRef.current?.stop();
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
+  function toggleChatMic() {
+    if (micListening) {
+      try {
+        micRecRef.current?.stop();
+      } catch {
+        // ignore
+      }
+      setMicListening(false);
+      return;
+    }
+    const w = window as unknown as {
+      SpeechRecognition?: new () => {
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        start: () => void;
+        stop: () => void;
+        onresult: ((ev: {
+          results: ArrayLike<ArrayLike<{ transcript: string }>>;
+        }) => void) | null;
+        onerror: ((ev: { error: string }) => void) | null;
+        onend: (() => void) | null;
+      };
+      webkitSpeechRecognition?: new () => {
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        start: () => void;
+        stop: () => void;
+        onresult: ((ev: {
+          results: ArrayLike<ArrayLike<{ transcript: string }>>;
+        }) => void) | null;
+        onerror: ((ev: { error: string }) => void) | null;
+        onend: (() => void) | null;
+      };
+    };
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) {
+      window.alert(t("voice.unsupported"));
+      return;
+    }
+    const base = locale.split("-")[0]?.toLowerCase() ?? "en";
+    const lang =
+      base === "tg" ? "ru-RU" : base === "ru" ? "ru-RU" : "en-US";
+    const rec = new Ctor();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = lang;
+    rec.onresult = (ev) => {
+      const last = ev.results[ev.results.length - 1];
+      const text = last?.[0]?.transcript ?? "";
+      if (text) setInput(text);
+    };
+    rec.onerror = (ev) => {
+      setMicListening(false);
+      if (ev.error === "not-allowed") window.alert(t("voice.micDenied"));
+      else if (ev.error === "no-speech") window.alert(t("voice.noSpeech"));
+    };
+    rec.onend = () => setMicListening(false);
+    micRecRef.current = rec;
+    try {
+      rec.start();
+      setMicListening(true);
+    } catch {
+      window.alert(t("voice.unsupported"));
+    }
+  }
 
   useEffect(() => {
     let id = pluginFromUrl;
@@ -905,9 +985,14 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
             <>
               <button
                 type="button"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[var(--fg-subtle)]"
-                aria-label="Voice"
-                disabled
+                onClick={toggleChatMic}
+                className={cn(
+                  "grid h-10 w-10 shrink-0 place-items-center rounded-full",
+                  micListening
+                    ? "bg-red-500/15 text-red-500"
+                    : "text-[var(--fg-subtle)] hover:bg-[var(--surface-2)]",
+                )}
+                aria-label={micListening ? t("voice.stop") : t("voice.start")}
               >
                 <Mic className="h-5 w-5" />
               </button>

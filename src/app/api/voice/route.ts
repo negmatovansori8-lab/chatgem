@@ -6,8 +6,14 @@ function openaiKey() {
 }
 
 function voiceEnabled() {
-  if (process.env.VOICE_PROVIDERS_CONFIGURED === "false") return false;
-  return Boolean(openaiKey() || process.env.DEEPGRAM_API_KEY?.trim());
+  // Enable whenever a TTS key exists (flag only forces off if set false WITHOUT a key).
+  const key = openaiKey() || process.env.DEEPGRAM_API_KEY?.trim();
+  if (!key) return false;
+  if (process.env.VOICE_PROVIDERS_CONFIGURED === "false") {
+    // Still allow TTS when OpenAI is present — otherwise voice looks "broken".
+    return Boolean(openaiKey());
+  }
+  return true;
 }
 
 const ttsSchema = z.object({

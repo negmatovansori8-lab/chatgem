@@ -13,7 +13,9 @@ type SpeechRec = {
   lang: string;
   start: () => void;
   stop: () => void;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onresult: ((event: {
+    results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal?: boolean }>;
+  }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
 };
@@ -27,17 +29,37 @@ function getSpeechRecognition(): (new () => SpeechRec) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-function speechLang(locale: string) {
-  const base = locale.split("-")[0]?.toLowerCase() ?? "tg";
-  const map: Record<string, string> = {
-    tg: "tg-TJ",
-    ru: "ru-RU",
-    uz: "uz-UZ",
-    en: "en-US",
-    fa: "fa-IR",
-    ar: "ar-SA",
+/** Browser STT langs — tg rarely supported, so fall back. */
+function speechLangCandidates(locale: string): string[] {
+  const base = locale.split("-")[0]?.toLowerCase() ?? "en";
+  const map: Record<string, string[]> = {
+    tg: ["ru-RU", "en-US", "tg-TJ"],
+    ru: ["ru-RU", "en-US"],
+    uz: ["uz-UZ", "ru-RU", "en-US"],
+    en: ["en-US", "en-GB"],
+    fa: ["fa-IR", "en-US"],
+    ar: ["ar-SA", "en-US"],
   };
-  return map[base] ?? `${base}-${base.toUpperCase()}`;
+  return map[base] ?? [`${base}-${base.toUpperCase()}`, "en-US"];
+}
+
+function speakBrowser(text: string, locale: string) {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 1.02;
+  const langs = speechLangCandidates(locale);
+  const voices = window.speechSynthesis.getVoices();
+  const match = voices.find((v) =>
+    langs.some((l) => v.lang.toLowerCase().startsWith(l.slice(0, 2))),
+  );
+  if (match) {
+    utter.voice = match;
+    utter.lang = match.lang;
+  } else {
+    utter.lang = langs[0] ?? "en-US";
+  }
+  window.speechSynthesis.speak(utter);
 }
 
 export function VoiceWorkspace() {
@@ -48,6 +70,9 @@ export function VoiceWorkspace() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const recRef = useRef<SpeechRec | null>(null);
+  const finalRef = useRef("");
+  const liveRef = useRef("");
+  const autoAskRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -56,6 +81,7 @@ export function VoiceWorkspace() {
       } catch {
         // ignore
       }
+      if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     };
   }, []);
 
@@ -67,7 +93,12 @@ export function VoiceWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "tts", text: text.slice(0, 4000) }),
       });
-      const data = await res.json();
+      const data = (await res.json().catch(() => ({}))) as {
+        audioBase64?: string;
+        mimeType?: string;
+        message?: string;
+        error?: { message?: string };
+      };
       if (res.ok && typeof data.audioBase64 === "string") {
         const audio = new Audio(
           `data:${data.mimeType ?? "audio/mpeg"};base64,${data.audioBase64}`,
@@ -75,14 +106,13 @@ export function VoiceWorkspace() {
         await audio.play();
         return;
       }
+      if (data.message || data.error?.message) {
+        setNotice(data.message || data.error?.message || null);
+      }
     } catch {
-      // fall through to browser TTS
+      // fall through
     }
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = 1;
-    window.speechSynthesis.speak(utter);
+    speakBrowser(text, locale);
   }
 
   function startListening() {
@@ -94,26 +124,75 @@ export function VoiceWorkspace() {
     setNotice(null);
     setTranscript("");
     setAnswer("");
-    const rec = new Ctor();
-    rec.continuous = false;
-    rec.interimResults = true;
-    rec.lang = speechLang(locale);
-    rec.onresult = (event) => {
-      const last = event.results[event.results.length - 1];
-      const text = last?.[0]?.transcript ?? "";
-      setTranscript(text);
+    finalRef.current = "";
+    autoAskRef.current = true;
+
+    const langs = speechLangCandidates(locale);
+    let langIndex = 0;
+
+    const startWithLang = (lang: string) => {
+      const rec = new Ctor();
+      rec.continuous = false;
+      rec.interimResults = true;
+      rec.lang = lang;
+      rec.onresult = (event) => {
+        let interim = "";
+        let finalText = finalRef.current;
+        for (let i = 0; i < event.results.length; i++) {
+          const row = event.results[i];
+          const piece = row?.[0]?.transcript ?? "";
+          if ((row as { isFinal?: boolean }).isFinal) {
+            finalText = `${finalText} ${piece}`.trim();
+          } else {
+            interim = piece;
+          }
+        }
+        finalRef.current = finalText;
+        const shown = (finalText || interim).trim();
+        liveRef.current = shown;
+        setTranscript(shown);
+      };
+      rec.onerror = (event) => {
+        const err = event.error;
+        if (
+          (err === "language-not-supported" || err === "service-not-allowed") &&
+          langIndex < langs.length - 1
+        ) {
+          langIndex += 1;
+          startWithLang(langs[langIndex]!);
+          return;
+        }
+        if (err === "no-speech") {
+          setNotice(t("voice.noSpeech"));
+        } else if (err === "not-allowed") {
+          setNotice(t("voice.micDenied"));
+        } else {
+          setNotice(err);
+        }
+        setListening(false);
+      };
+      rec.onend = () => {
+        setListening(false);
+        const text = (finalRef.current || liveRef.current).trim();
+        if (autoAskRef.current && text) {
+          autoAskRef.current = false;
+          void askAi(text);
+        }
+      };
+      recRef.current = rec;
+      try {
+        rec.start();
+        setListening(true);
+      } catch {
+        setNotice(t("voice.unsupported"));
+      }
     };
-    rec.onerror = (event) => {
-      setNotice(event.error);
-      setListening(false);
-    };
-    rec.onend = () => setListening(false);
-    recRef.current = rec;
-    rec.start();
-    setListening(true);
+
+    startWithLang(langs[0]!);
   }
 
   function stopListening() {
+    autoAskRef.current = false;
     try {
       recRef.current?.stop();
     } catch {
@@ -122,18 +201,24 @@ export function VoiceWorkspace() {
     setListening(false);
   }
 
-  async function askAi() {
-    if (!transcript.trim() || busy) return;
+  async function askAi(prompt?: string) {
+    const q = (prompt ?? transcript).trim();
+    if (!q || busy) return;
     setBusy(true);
     setAnswer("");
     setNotice(t("voice.thinking"));
     let text = "";
     await streamChatMessage({
-      content: transcript,
+      content: q,
       locale,
       onEvent: (event) => {
         if (event.type === "token" && typeof event.content === "string") {
           text += event.content;
+          setAnswer(text);
+          setNotice(null);
+        }
+        if (event.type === "replace" && typeof event.content === "string") {
+          text = event.content;
           setAnswer(text);
           setNotice(null);
         }
@@ -160,6 +245,7 @@ export function VoiceWorkspace() {
         <button
           type="button"
           onClick={() => (listening ? stopListening() : startListening())}
+          disabled={busy}
           className={cn(
             "grid size-28 place-items-center rounded-full transition",
             listening
@@ -203,7 +289,7 @@ export function VoiceWorkspace() {
           <button
             type="button"
             onClick={() => answer && void speak(answer)}
-            disabled={!answer}
+            disabled={!answer || busy}
             className="inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-sm disabled:opacity-40"
           >
             <Volume2 className="h-4 w-4" />
