@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateImageFromPrompt } from "@/lib/generate-image";
 
-export const maxDuration = 90;
+export const maxDuration = 120;
 export const runtime = "nodejs";
 
 const schema = z.object({

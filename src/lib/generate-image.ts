@@ -20,6 +20,75 @@ function openaiKey() {
   return process.env.OPENAI_API_KEY?.trim() || "";
 }
 
+type Attempt = {
+  label: string;
+  body: Record<string, unknown>;
+};
+
+function worldClassAttempts(
+  prompt: string,
+  kind: "logo" | "photo" | "general",
+): Attempt[] {
+  const p = prompt.slice(0, 3200);
+  const size =
+    kind === "photo" ? "1536x1024" : kind === "logo" ? "1024x1024" : "1024x1024";
+
+  // Newest GPT Image models first (DALL·E 3 retired on many accounts).
+  const gptModels = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1"] as const;
+  const attempts: Attempt[] = [];
+
+  for (const model of gptModels) {
+    attempts.push({
+      label: `${model}-high`,
+      body: {
+        model,
+        prompt: p,
+        n: 1,
+        size,
+        quality: "high",
+        output_format: "png",
+      },
+    });
+    attempts.push({
+      label: `${model}-medium`,
+      body: {
+        model,
+        prompt: p,
+        n: 1,
+        size: "1024x1024",
+        quality: "medium",
+        output_format: "png",
+      },
+    });
+  }
+
+  // Legacy DALL·E 3 if still enabled on the key
+  attempts.push({
+    label: "dall-e-3-hd",
+    body: {
+      model: "dall-e-3",
+      prompt: p.slice(0, 3900),
+      n: 1,
+      size: "1024x1024",
+      quality: "hd",
+      style: kind === "photo" ? "natural" : "vivid",
+    },
+  });
+  attempts.push({
+    label: "dall-e-3-standard",
+    body: {
+      model: "dall-e-3",
+      prompt: p.slice(0, 3900),
+      n: 1,
+      size: "1024x1024",
+      quality: "standard",
+      style: kind === "photo" ? "natural" : "vivid",
+    },
+  });
+
+  return attempts;
+}
+
 async function generateWithOpenAI(
   prompt: string,
   kind: "logo" | "photo" | "general",
@@ -29,48 +98,23 @@ async function generateWithOpenAI(
     return { ok: false, detail: "OPENAI_API_KEY missing on server" };
   }
 
-  const style = kind === "photo" ? "natural" : "vivid";
-  const attempts: Array<Record<string, unknown>> = [
-    {
-      model: "dall-e-3",
-      prompt: prompt.slice(0, 3900),
-      n: 1,
-      size: "1024x1024",
-      quality: "hd",
-      style,
-    },
-    {
-      model: "dall-e-3",
-      prompt: prompt.slice(0, 3900),
-      n: 1,
-      size: "1024x1024",
-      quality: "standard",
-      style,
-    },
-    {
-      model: "dall-e-2",
-      prompt: prompt.slice(0, 900),
-      n: 1,
-      size: "1024x1024",
-    },
-  ];
-
   let lastDetail = "OpenAI images failed";
   let lastStatus = 0;
 
-  for (const body of attempts) {
+  for (const attempt of worldClassAttempts(prompt, kind)) {
     const res = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(attempt.body),
+      signal: AbortSignal.timeout(120_000),
     });
     const raw = await res.text().catch(() => "");
     if (!res.ok) {
       lastStatus = res.status;
-      lastDetail = raw.slice(0, 400) || `HTTP ${res.status}`;
+      lastDetail = `${attempt.label}: ${raw.slice(0, 280) || `HTTP ${res.status}`}`;
       continue;
     }
     try {
@@ -81,7 +125,7 @@ async function generateWithOpenAI(
       if (first?.b64_json) {
         return {
           ok: true,
-          provider: String(body.model),
+          provider: attempt.label,
           url: `data:image/png;base64,${first.b64_json}`,
         };
       }
@@ -91,7 +135,7 @@ async function generateWithOpenAI(
           const buf = await img.arrayBuffer();
           return {
             ok: true,
-            provider: `${String(body.model)}${body.quality === "hd" ? "-hd" : ""}`,
+            provider: attempt.label,
             url: await toDataUrl(
               buf,
               img.headers.get("content-type") || "image/png",
@@ -99,16 +143,15 @@ async function generateWithOpenAI(
           };
         }
       }
-      lastDetail = "Empty image payload from OpenAI";
+      lastDetail = `${attempt.label}: empty image payload`;
     } catch {
-      lastDetail = "Invalid OpenAI response";
+      lastDetail = `${attempt.label}: invalid response`;
     }
   }
 
   return { ok: false, detail: lastDetail, status: lastStatus };
 }
 
-/** Short locked prompt — Flux ignores long essays and invents phones/faces. */
 function pollinationsPrompt(
   subject: string,
   kind: "logo" | "photo" | "general",
@@ -116,22 +159,22 @@ function pollinationsPrompt(
   const s = subject.trim() || "the subject";
   if (kind === "logo") {
     return [
-      `simple modern app logo icon of ${s}`,
-      `flat vector, centered, square, plain white background`,
-      `sharp, high contrast, no phone, no mockup, no person, no watermark, no text blur`,
+      `award winning app logo of ${s}`,
+      `flat vector icon, centered, square, plain white background`,
+      `ultra sharp, high contrast, no phone, no mockup, no person, no watermark`,
     ].join(", ");
   }
   if (kind === "photo") {
     return [
-      `sharp photorealistic photo of ${s}`,
-      `main subject clearly visible and in focus`,
-      `natural light, detailed, no phone screen, no mockup frame, no watermark, no blurry mess`,
+      `ultra sharp photorealistic photo of ${s}`,
+      `8k detail, cinematic lighting, subject fills frame`,
+      `no phone screen, no mockup, no watermark, no blur`,
     ].join(", ");
   }
   return [
-    `clear detailed image of ${s}`,
-    `subject fills the frame, sharp focus`,
-    `no phone, no mockup, no random person, no watermark`,
+    `masterpiece detailed image of ${s}`,
+    `sharp focus, beautiful lighting, subject fills frame`,
+    `no phone, no mockup, no watermark`,
   ].join(", ");
 }
 
@@ -142,8 +185,7 @@ async function generateWithPollinations(
   const prompt = pollinationsPrompt(subject, kind);
   const encoded = encodeURIComponent(prompt);
   const seed = Date.now() % 100000;
-  // Keep prompt short; nologo=true; private to reduce feed defaults.
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&private=true&nofeed=true&model=flux&seed=${seed}`;
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1280&height=1280&nologo=true&private=true&nofeed=true&model=flux&seed=${seed}`;
 
   try {
     const res = await fetch(url, {
@@ -166,7 +208,7 @@ async function generateWithPollinations(
       provider: "pollinations-flux",
       url: await toDataUrl(buf, mime),
       warning:
-        "Сифати ройгон (Pollinations). Барои сурати HD дар Render OPENAI_API_KEY + пул гузоред.",
+        "Ин сифати ройгон аст. Барои сатҳи ҷаҳонӣ: Render → Environment → OPENAI_API_KEY + Billing дар platform.openai.com ($10+).",
     };
   } catch (error) {
     return {
@@ -180,21 +222,24 @@ async function generateWithPollinations(
 function friendlyOpenAIFail(detail: string): string {
   const d = detail.toLowerCase();
   if (/missing/.test(d)) {
-    return "OPENAI_API_KEY дар Render нест. Environment → илова кунед.";
+    return "OPENAI_API_KEY дар Render нест.";
   }
   if (/insufficient_quota|billing|credit|exceeded/.test(d)) {
-    return "Пули OpenAI тамом шуд — platform.openai.com → Billing.";
+    return "Пули OpenAI тамом — platform.openai.com → Billing.";
   }
   if (/401|invalid.?api|incorrect.?api/.test(d)) {
     return "OPENAI_API_KEY нодуруст аст.";
   }
   if (/429|rate.?limit/.test(d)) {
-    return "Лимити OpenAI пур шуд — як дақиқа интизор шавед.";
+    return "Лимити OpenAI пур шуд.";
   }
-  return detail.slice(0, 200);
+  if (/organization.?must.?be.?verified|verification/.test(d)) {
+    return "OpenAI Organization Verification лозим (барои GPT Image).";
+  }
+  return detail.slice(0, 220);
 }
 
-/** Shared image pipeline for /api/images and chat intercept. */
+/** World-class image pipeline: GPT Image high → DALL·E → Flux fallback. */
 export async function generateImageFromPrompt(
   rawPrompt: string,
   kindHint?: "logo" | "photo" | "general" | "auto",
@@ -210,11 +255,12 @@ export async function generateImageFromPrompt(
     return { ...openai, kind, prompt, subject };
   }
 
-  if (subject && subject.length < 120) {
+  // Second pass: ultra-short English subject (better model adherence)
+  if (subject && subject.length < 160) {
     const shortPrompt =
       kind === "logo"
-        ? `Simple modern logo icon for ${subject}, flat vector, white background, no mockup, no phone, no watermark`
-        : `Sharp clear photo of ${subject} only, in focus, no phone mockup, no watermark`;
+        ? `World-class minimal logo icon for "${subject}", flat vector, centered on white, no mockup, no phone, no watermark, crisp edges`
+        : `World-class ultra-sharp photograph of ${subject}, subject fills the frame, cinematic light, 8K detail, no phone mockup, no watermark`;
     const retry = await generateWithOpenAI(shortPrompt, kind);
     if (retry.ok) {
       return { ...retry, kind, prompt: shortPrompt, subject };

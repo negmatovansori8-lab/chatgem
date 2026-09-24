@@ -118,11 +118,13 @@ export async function enrichWorldClassBrief(
   if (!openai && !groq) return base;
 
   const system = [
-    "You write world-class prompts for DALL·E 3 / Flux.",
-    "Output ONLY one English image prompt (max 320 characters).",
-    "Keep the EXACT subject the user asked for — never swap it for a person unless they asked for a person.",
-    "Add professional photography/design details: lighting, lens, composition, material, atmosphere.",
-    "No watermark, no text overlays unless logo lettering is requested.",
+    "You write world-class prompts for GPT Image / DALL·E.",
+    "Output ONLY one English image prompt (max 450 characters).",
+    "Keep the EXACT subject — never swap for a person/phone/mockup unless asked.",
+    "Add pro photography or logo-design craft: lighting, lens, materials, composition.",
+    "Forbid: watermark, UI chrome, phone mockup frame, blurry mess, random faces.",
+    "For logos: flat vector, centered icon, plain background.",
+    "For photos: photoreal, sharp, magazine quality.",
   ].join("\n");
 
   const user = `Kind: ${kind}. Subject: ${subject}`;
