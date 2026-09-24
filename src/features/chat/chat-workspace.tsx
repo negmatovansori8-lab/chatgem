@@ -5,20 +5,25 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowUp,
+  Check,
   Copy,
   Download,
   ImageIcon,
   Mic,
+  Pencil,
   Plus,
   RefreshCw,
   Square,
+  X,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { MarkdownMessage, TypingIndicator } from "@/features/chat/markdown-message";
 import { AppMenuButton } from "@/components/layout/app-shell";
+import { ImageLightbox } from "@/components/media/image-lightbox";
 import { UserMenu } from "@/features/profile/profile-workspace";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { useToast } from "@/components/ui/toast";
 import {
   streamChatMessage,
   useModels,
@@ -127,6 +132,7 @@ function dedupeBubbles(list: Bubble[]) {
 
 export function ChatWorkspace({ chatId }: { chatId?: string }) {
   const { locale, t } = useI18n();
+  const toast = useToast();
   const searchParams = useSearchParams();
   const pluginFromUrl = searchParams.get("plugin") || undefined;
   const [pluginId, setPluginId] = useState<string | undefined>(pluginFromUrl);
@@ -139,6 +145,9 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
   const [modelId, setModelId] = useState<string>("");
   const [activeChatId, setActiveChatId] = useState<string | undefined>(chatId);
   const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const sendingRef = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -201,7 +210,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
     };
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!Ctor) {
-      window.alert(t("voice.unsupported"));
+      toast.error(t("voice.unsupported"));
       return;
     }
     const base = locale.split("-")[0]?.toLowerCase() ?? "en";
@@ -218,8 +227,8 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
     };
     rec.onerror = (ev) => {
       setMicListening(false);
-      if (ev.error === "not-allowed") window.alert(t("voice.micDenied"));
-      else if (ev.error === "no-speech") window.alert(t("voice.noSpeech"));
+      if (ev.error === "not-allowed") toast.error(t("voice.micDenied"));
+      else if (ev.error === "no-speech") toast.info(t("voice.noSpeech"));
     };
     rec.onend = () => setMicListening(false);
     micRecRef.current = rec;
@@ -227,7 +236,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
       rec.start();
       setMicListening(true);
     } catch {
-      window.alert(t("voice.unsupported"));
+      toast.error(t("voice.unsupported"));
     }
   }
 
@@ -344,7 +353,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
 
   async function sendPrompt(
     prompt: string,
-    opts?: { regenerate?: boolean; forceImage?: boolean },
+    opts?: { regenerate?: boolean; forceImage?: boolean; editUserId?: string },
   ) {
     const text = prompt.trim();
     const pendingAttachments = attachments;
@@ -369,7 +378,20 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
       .map((a) => a.previewUrl || a.dataUrl)
       .filter(Boolean) as string[];
 
-    if (opts?.regenerate) {
+    if (opts?.editUserId) {
+      setMessages((prev) => {
+        const next = prev.map((m) =>
+          m.id === opts.editUserId ? { ...m, content: displayText } : m,
+        );
+        for (let i = next.length - 1; i >= 0; i -= 1) {
+          if (next[i]?.role === "assistant") {
+            next.splice(i, 1);
+            break;
+          }
+        }
+        return next;
+      });
+    } else if (opts?.regenerate) {
       setMessages((prev) => {
         const next = [...prev];
         for (let i = next.length - 1; i >= 0; i -= 1) {
@@ -732,36 +754,37 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
             {messages.map((message, index) => {
               const isLastAssistant =
                 message.role === "assistant" && index === messages.length - 1;
+              const isEditing = editingId === message.id;
               return (
                 <div
                   key={message.id}
                   className={cn(
                     "group max-w-[92%] text-[15px] leading-7",
                     message.role === "user"
-                      ? "ml-auto rounded-[1.5rem] bg-[var(--surface-3)] px-4 py-3 text-[var(--fg)]"
+                      ? "ml-auto rounded-[1.5rem] bg-[var(--surface-3)] px-4 py-3 text-[var(--fg)] shadow-[0_8px_30px_-20px_rgba(0,0,0,0.45)]"
                       : "text-[var(--fg)]",
                   )}
                 >
                   {message.role === "assistant" ? (
                     <>
-                      {message.pending && !message.imageUrl ? (
-                        message.content.trim() ? (
-                          <p className="text-sm text-[var(--fg-muted)]">
-                            {message.content}
-                          </p>
-                        ) : (
-                          <TypingIndicator />
-                        )
+                      {message.pending && !message.imageUrl && !message.content.trim() ? (
+                        <TypingIndicator />
                       ) : (
                         <div className="space-y-3">
                           {message.imageUrl ? (
                             <div className="space-y-2">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={message.imageUrl}
-                                alt=""
-                                className="max-h-[min(70vh,560px)] w-full rounded-2xl border border-[var(--border)] object-contain bg-[var(--surface)]"
-                              />
+                              <button
+                                type="button"
+                                className="block w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-left transition hover:ring-2 hover:ring-[var(--accent)]/40"
+                                onClick={() => setLightboxSrc(message.imageUrl!)}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={message.imageUrl}
+                                  alt=""
+                                  className="max-h-[min(70vh,560px)] w-full object-contain"
+                                />
+                              </button>
                               <div className="flex flex-wrap gap-2">
                                 <a
                                   href={message.imageUrl}
@@ -781,8 +804,13 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                               </div>
                             </div>
                           ) : null}
-                          {message.content.trim() && !message.pending ? (
-                            <MarkdownMessage content={message.content} />
+                          {message.content.trim() ? (
+                            <div className={cn(message.pending && "opacity-90")}>
+                              <MarkdownMessage content={message.content} />
+                              {message.pending ? (
+                                <span className="ms-1 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-[var(--accent)] align-middle" />
+                              ) : null}
+                            </div>
                           ) : null}
                         </div>
                       )}
@@ -791,9 +819,10 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                           <button
                             type="button"
                             className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--fg-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
-                            onClick={() =>
-                              void navigator.clipboard.writeText(message.content)
-                            }
+                            onClick={() => {
+                              void navigator.clipboard.writeText(message.content);
+                              toast.success(t("chat.copied"));
+                            }}
                           >
                             <Copy className="h-3.5 w-3.5" />
                             {t("chat.copy")}
@@ -837,13 +866,81 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                                 key={url}
                                 src={url}
                                 alt=""
-                                className="max-h-40 max-w-[220px] rounded-xl object-cover"
+                                className="max-h-40 max-w-[220px] cursor-zoom-in rounded-xl object-cover"
+                                onClick={() => setLightboxSrc(url)}
                               />
                             ),
                           )}
                         </div>
                       ) : null}
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={editDraft}
+                            onChange={(e) => setEditDraft(e.target.value)}
+                            rows={3}
+                            className="min-h-[72px] rounded-xl border-[var(--border)] bg-[var(--bg)] text-[15px]"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent)] px-2.5 py-1.5 text-xs font-semibold text-[var(--accent-fg)]"
+                              disabled={busy || !editDraft.trim()}
+                              onClick={() => {
+                                const next = editDraft.trim();
+                                if (!next) return;
+                                const id = message.id;
+                                setEditingId(null);
+                                void sendPrompt(next, {
+                                  regenerate: true,
+                                  editUserId: id,
+                                });
+                              }}
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              {t("chat.saveEdit")}
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs text-[var(--fg-subtle)] hover:bg-[var(--surface-2)]"
+                              onClick={() => setEditingId(null)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              {t("chat.cancelEdit")}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="whitespace-pre-wrap">{message.content}</p>
+                          {!busy ? (
+                            <div className="mt-1 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--fg-subtle)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
+                                onClick={() => {
+                                  setEditingId(message.id);
+                                  setEditDraft(message.content);
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                {t("chat.edit")}
+                              </button>
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--fg-subtle)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
+                                onClick={() => {
+                                  void navigator.clipboard.writeText(message.content);
+                                  toast.success(t("chat.copied"));
+                                }}
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                                {t("chat.copy")}
+                              </button>
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -918,7 +1015,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
           </div>
         ) : null}
 
-        <div className="mx-auto flex max-w-3xl items-end gap-1 rounded-[1.75rem] border border-[var(--border)] bg-[var(--composer)] px-1.5 py-1.5 shadow-[0_-4px_24px_rgba(0,0,0,0.12)]">
+        <div className="mx-auto flex max-w-3xl items-end gap-1 rounded-[1.75rem] border border-[var(--border)] bg-[var(--composer)] px-1.5 py-1.5 shadow-[0_-8px_40px_-18px_rgba(0,0,0,0.35)] ring-1 ring-white/5 transition focus-within:border-[var(--accent)]/40 focus-within:ring-[var(--accent)]/20">
           <input
             ref={fileRef}
             type="file"
@@ -1047,6 +1144,24 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
           </select>
         </div>
       </form>
+
+      <ImageLightbox
+        open={Boolean(lightboxSrc)}
+        src={lightboxSrc}
+        onClose={() => setLightboxSrc(null)}
+        downloadLabel={t("gallery.download")}
+        onDownload={
+          lightboxSrc
+            ? () => {
+                const a = document.createElement("a");
+                a.href = lightboxSrc;
+                a.download = `chatgem-${Date.now()}.png`;
+                a.click();
+                toast.success(t("gallery.download"));
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

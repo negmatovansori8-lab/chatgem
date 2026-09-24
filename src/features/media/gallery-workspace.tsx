@@ -4,13 +4,18 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUp,
+  Download,
   ImageIcon,
   Loader2,
   Mic,
+  RefreshCw,
+  Sparkles,
   X,
 } from "lucide-react";
 import { AppBackButton } from "@/components/layout/app-back-button";
+import { ImageLightbox } from "@/components/media/image-lightbox";
 import { useI18n } from "@/components/i18n/locale-provider";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 type StyleCard = {
@@ -77,13 +82,23 @@ type MadeItem = {
   prompt: string;
 };
 
+function persistLibrary(items: MadeItem[]) {
+  try {
+    localStorage.setItem("nj_image_library_v1", JSON.stringify(items.slice(0, 40)));
+  } catch {
+    // ignore
+  }
+}
+
 export function GalleryWorkspace() {
   const { t } = useI18n();
+  const toast = useToast();
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] = useState<MadeItem | null>(null);
   const [library, setLibrary] = useState<MadeItem[]>([]);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -97,54 +112,58 @@ export function GalleryWorkspace() {
     }
   }, []);
 
-  async function generate(text: string) {
+  async function generate(text: string, asVariation = false) {
     const q = text.trim();
     if (!q || busy) return;
     setBusy(true);
     setMessage(null);
-    const res = await fetch("/api/images", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: q }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) {
-      setMessage(data.error?.message ?? t("gallery.errorGenerate"));
-      return;
-    }
-    if (typeof data.url === "string") {
-      const item: MadeItem = {
-        id: crypto.randomUUID(),
-        url: data.url,
-        prompt: q,
-      };
-      setResult(item);
-      setLibrary((prev) => [item, ...prev].slice(0, 40));
-      try {
-        const raw = localStorage.getItem("nj_image_library_v1");
-        const prev = raw ? (JSON.parse(raw) as MadeItem[]) : [];
-        localStorage.setItem(
-          "nj_image_library_v1",
-          JSON.stringify([item, ...prev].slice(0, 40)),
-        );
-      } catch {
-        // ignore
+    const finalPrompt = asVariation
+      ? `${q}, alternative variation, different composition, same subject`
+      : q;
+    try {
+      const res = await fetch("/api/images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: finalPrompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const err = data.error?.message ?? t("gallery.errorGenerate");
+        setMessage(err);
+        toast.error(err);
+        return;
       }
-    }
-    setMessage(
-      typeof data.message === "string"
-        ? data.message
-        : t("gallery.done"),
-    );
-    if (data.openaiError?.detail) {
-      const detail =
-        typeof data.openaiError.detail === "string"
-          ? data.openaiError.detail.slice(0, 180)
-          : "";
-      if (detail) {
-        setMessage((prev) => `${prev ?? ""}\nOpenAI: ${detail}`);
+      if (typeof data.url === "string") {
+        const item: MadeItem = {
+          id: crypto.randomUUID(),
+          url: data.url,
+          prompt: q,
+        };
+        setResult(item);
+        setLibrary((prev) => {
+          const next = [item, ...prev].slice(0, 40);
+          persistLibrary(next);
+          return next;
+        });
+        toast.success(t("gallery.done"));
       }
+      setMessage(
+        typeof data.message === "string" ? data.message : t("gallery.done"),
+      );
+      if (data.openaiError?.detail) {
+        const detail =
+          typeof data.openaiError.detail === "string"
+            ? data.openaiError.detail.slice(0, 180)
+            : "";
+        if (detail) {
+          setMessage((prev) => `${prev ?? ""}\nOpenAI: ${detail}`);
+        }
+      }
+    } catch {
+      toast.error(t("gallery.errorGenerate"));
+      setMessage(t("gallery.errorGenerate"));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -156,6 +175,14 @@ export function GalleryWorkspace() {
   function pickStyle(style: StyleCard) {
     setPrompt(t(style.labelKey));
     void generate(style.prompt);
+  }
+
+  function downloadResult(item: MadeItem) {
+    const a = document.createElement("a");
+    a.href = item.url;
+    a.download = `chatgem-${item.id.slice(0, 8)}.png`;
+    a.click();
+    toast.success(t("gallery.download"));
   }
 
   return (
@@ -182,18 +209,62 @@ export function GalleryWorkspace() {
             {t("gallery.createTitle")}
           </h1>
 
+          {busy && !result ? (
+            <div className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-[#141414] sm:mb-8 sm:rounded-3xl">
+              <div className="flex aspect-[4/3] flex-col items-center justify-center gap-3 bg-gradient-to-br from-white/5 to-transparent">
+                <Loader2 className="h-8 w-8 animate-spin text-white/50" />
+                <p className="text-sm text-white/45">{t("gallery.loading")}</p>
+                <div className="mt-2 h-2 w-40 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full w-1/2 animate-pulse rounded-full bg-white/30" />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {result ? (
             <div className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-[#141414] sm:mb-8 sm:rounded-3xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={result.url}
-                alt={result.prompt}
-                className="max-h-[55vh] w-full object-cover"
-              />
-              <div className="flex items-start justify-between gap-2 px-3 py-2.5 sm:px-4">
+              <button
+                type="button"
+                className="block w-full"
+                onClick={() => setLightboxOpen(true)}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={result.url}
+                  alt={result.prompt}
+                  className="max-h-[55vh] w-full object-cover"
+                />
+              </button>
+              <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 sm:px-4">
                 <p className="min-w-0 flex-1 truncate text-sm text-white/55">
                   {result.prompt}
                 </p>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15"
+                  onClick={() => downloadResult(result)}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {t("gallery.download")}
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15"
+                  disabled={busy}
+                  onClick={() => void generate(result.prompt)}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  {t("gallery.regenerate")}
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15"
+                  disabled={busy}
+                  onClick={() => void generate(result.prompt, true)}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {t("gallery.variation")}
+                </button>
                 <button
                   type="button"
                   className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/40 hover:bg-white/10"
@@ -241,7 +312,10 @@ export function GalleryWorkspace() {
                     key={item.id}
                     type="button"
                     className="aspect-square overflow-hidden rounded-2xl"
-                    onClick={() => setResult(item)}
+                    onClick={() => {
+                      setResult(item);
+                      setPrompt(item.prompt);
+                    }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -283,11 +357,16 @@ export function GalleryWorkspace() {
                 prompt: file.name,
               };
               setResult(item);
-              setLibrary((prev) => [item, ...prev]);
+              setLibrary((prev) => {
+                const next = [item, ...prev];
+                persistLibrary(next);
+                return next;
+              });
               setMessage(t("gallery.updated"));
+              toast.success(t("gallery.updated"));
             }}
           />
-          <div className="flex items-end gap-1 rounded-[1.75rem] border border-white/10 bg-[#212121] px-1.5 py-1.5">
+          <div className="flex items-end gap-1 rounded-[1.75rem] border border-white/10 bg-[#212121] px-1.5 py-1.5 shadow-[0_0_40px_-20px_rgba(255,255,255,0.25)]">
             <button
               type="button"
               className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-white/70 hover:bg-white/10"
@@ -323,10 +402,10 @@ export function GalleryWorkspace() {
                 type="submit"
                 disabled={busy || !prompt.trim()}
                 className={cn(
-                  "grid h-11 w-11 shrink-0 place-items-center rounded-full",
+                  "grid h-11 w-11 shrink-0 place-items-center rounded-full transition",
                   busy || !prompt.trim()
                     ? "bg-white/15 text-white/40"
-                    : "bg-white text-black",
+                    : "bg-white text-black hover:scale-105",
                 )}
                 aria-label={t("gallery.generate")}
               >
@@ -340,6 +419,21 @@ export function GalleryWorkspace() {
           </div>
         </div>
       </form>
+
+      <ImageLightbox
+        open={lightboxOpen}
+        src={result?.url ?? null}
+        alt={result?.prompt}
+        onClose={() => setLightboxOpen(false)}
+        downloadLabel={t("gallery.download")}
+        regenerateLabel={t("gallery.regenerate")}
+        onDownload={() => result && downloadResult(result)}
+        onRegenerate={() => {
+          if (!result) return;
+          setLightboxOpen(false);
+          void generate(result.prompt);
+        }}
+      />
     </div>
   );
 }

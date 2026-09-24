@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Outfit, Syne, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { LocaleProvider } from "@/components/i18n/locale-provider";
+import { ToastProvider } from "@/components/ui/toast";
 import { WelcomeGate } from "@/components/welcome-gate";
 import { brand } from "@/config/site";
 import "./globals.css";
@@ -75,7 +76,9 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <LocaleProvider>
-            <WelcomeGate>{children}</WelcomeGate>
+            <ToastProvider>
+              <WelcomeGate>{children}</WelcomeGate>
+            </ToastProvider>
           </LocaleProvider>
         </ThemeProvider>
       </body>

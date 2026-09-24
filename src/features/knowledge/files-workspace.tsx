@@ -4,14 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { FileText, Trash2, Upload } from "lucide-react";
 import { AppBackButton } from "@/components/layout/app-back-button";
 import { useI18n } from "@/components/i18n/locale-provider";
+import { useToast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 import type { FileRecord } from "@/types/knowledge";
 
 export function FilesWorkspace() {
   const { t } = useI18n();
+  const toast = useToast();
   const [files, setFiles] = useState<FileRecord[]>([]);
   const [selected, setSelected] = useState<FileRecord | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -30,21 +34,33 @@ export function FilesWorkspace() {
     setError(null);
     const form = new FormData();
     form.append("file", list[0]);
-    const res = await fetch("/api/files", { method: "POST", body: form });
-    const data = await res.json();
-    setUploading(false);
-    if (!res.ok) {
-      setError(data.error?.message ?? t("files.error"));
-      return;
+    try {
+      const res = await fetch("/api/files", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error?.message ?? t("files.error");
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+      await refresh();
+      setSelected(data.file);
+      toast.success(t("files.upload"));
+    } catch {
+      const msg = t("files.error");
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
     }
-    await refresh();
-    setSelected(data.file);
   }
 
   async function onDelete(id: string) {
     await fetch(`/api/files/${id}`, { method: "DELETE" });
     if (selected?.id === id) setSelected(null);
     await refresh();
+    toast.info(t("common.delete"));
   }
 
   return (
@@ -64,12 +80,32 @@ export function FilesWorkspace() {
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="mb-5 flex w-full flex-col items-center gap-2 rounded-2xl border border-dashed border-white/15 bg-[#1a1a1a] px-4 py-8 disabled:opacity-50"
+          onDragEnter={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            void onUpload(e.dataTransfer.files);
+          }}
+          className={cn(
+            "mb-5 flex w-full flex-col items-center gap-2 rounded-2xl border border-dashed px-4 py-8 transition disabled:opacity-50",
+            dragOver
+              ? "border-[var(--accent)] bg-[var(--accent)]/10"
+              : "border-white/15 bg-[#1a1a1a]",
+          )}
         >
           <input
             ref={inputRef}
             type="file"
             className="hidden"
+            accept=".pdf,.txt,.doc,.docx,.md,.json,image/*,text/*,.js,.ts,.tsx,.py,.css,.html"
             onChange={(e) => void onUpload(e.target.files)}
           />
           <Upload className="h-7 w-7 text-white/50" />
@@ -77,6 +113,7 @@ export function FilesWorkspace() {
             {uploading ? t("files.uploading") : t("files.upload")}
           </span>
           <span className="text-xs text-white/35">{t("files.formats")}</span>
+          <span className="text-[11px] text-white/30">{t("gallery.drop")}</span>
         </button>
         {error ? <p className="mb-3 text-center text-xs text-red-400">{error}</p> : null}
 

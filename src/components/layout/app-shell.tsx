@@ -17,6 +17,7 @@ import {
   ImageIcon,
   Menu,
   Pencil,
+  Pin,
   Puzzle,
   Search,
   Trash2,
@@ -26,6 +27,7 @@ import { useChatList } from "@/features/chat/use-chat-api";
 import { UserMenu } from "@/features/profile/profile-workspace";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 type SidebarCtx = {
@@ -54,8 +56,10 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useI18n();
+  const toast = useToast();
   const { setOpen } = useAppSidebar();
-  const { chats, refresh, setChats } = useChatList("");
+  const [query, setQuery] = useState("");
+  const { chats, refresh, setChats } = useChatList(query);
 
   useEffect(() => {
     void refresh();
@@ -68,14 +72,60 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
 
   async function deleteChat(id: string) {
     const res = await fetch(`/api/chats/${id}`, { method: "DELETE" });
-    if (!res.ok) return;
+    if (!res.ok) {
+      toast.error(t("chat.requestFailed"));
+      return;
+    }
     setChats((prev) => prev.filter((c) => c.id !== id));
     window.dispatchEvent(new Event("nj:chats-changed"));
+    toast.success(t("chat.deleted"));
     if (pathname === `/app/chat/${id}`) {
       router.push("/app/chat");
       onNavigate?.();
     }
   }
+
+  async function renameChat(id: string, current: string) {
+    const next = window.prompt(t("chat.renamePrompt"), current)?.trim();
+    if (!next || next === current) return;
+    const res = await fetch(`/api/chats/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: next }),
+    });
+    if (!res.ok) {
+      toast.error(t("chat.requestFailed"));
+      return;
+    }
+    setChats((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, title: next } : c)),
+    );
+    window.dispatchEvent(new Event("nj:chats-changed"));
+    toast.success(t("chat.renamed"));
+  }
+
+  async function togglePin(id: string, pinned: boolean) {
+    const res = await fetch(`/api/chats/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned: !pinned }),
+    });
+    if (!res.ok) {
+      toast.error(t("chat.requestFailed"));
+      return;
+    }
+    setChats((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, pinned: !pinned } : c)),
+    );
+    window.dispatchEvent(new Event("nj:chats-changed"));
+  }
+
+  const sorted = [...chats].sort((a, b) => {
+    const ap = a.pinned ? 1 : 0;
+    const bp = b.pinned ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+    return 0;
+  });
 
   return (
     <div className="flex h-full flex-col bg-[var(--surface)] text-[var(--fg)]">
@@ -90,18 +140,19 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
             <X className="h-5 w-5" />
           </button>
           <p className="truncate text-[17px] font-semibold tracking-tight">ChatGem</p>
-          <button
-            type="button"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--fg-subtle)] hover:bg-[var(--surface-3)]"
-            aria-label="Search"
-            onClick={() => {
-              router.push("/app/search");
-              onNavigate?.();
-            }}
-          >
-            <Search className="h-4 w-4" />
-          </button>
         </div>
+      </div>
+
+      <div className="px-3 pb-2">
+        <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
+          <Search className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("chat.searchChats")}
+            className="min-w-0 flex-1 bg-transparent text-sm text-[var(--fg)] outline-none placeholder:text-[var(--fg-subtle)]"
+          />
+        </label>
       </div>
 
       <nav className="space-y-0.5 px-2">
@@ -131,7 +182,7 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         <ul className="space-y-0.5">
-          {chats.slice(0, 40).map((chat) => {
+          {sorted.slice(0, 40).map((chat) => {
             const active = pathname === `/app/chat/${chat.id}`;
             return (
               <li key={chat.id} className="group flex items-center gap-0.5">
@@ -145,8 +196,37 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
                       : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)]",
                   )}
                 >
+                  {chat.pinned ? (
+                    <Pin className="me-1.5 inline h-3 w-3 text-[var(--accent)]" />
+                  ) : null}
                   {chat.title}
                 </Link>
+                <button
+                  type="button"
+                  title={t("chat.pin")}
+                  aria-label={t("chat.pin")}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--fg-subtle)] opacity-100 hover:bg-[var(--surface-3)] hover:text-[var(--fg)] sm:opacity-0 sm:group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void togglePin(chat.id, Boolean(chat.pinned));
+                  }}
+                >
+                  <Pin className={cn("h-3.5 w-3.5", chat.pinned && "text-[var(--accent)]")} />
+                </button>
+                <button
+                  type="button"
+                  title={t("chat.rename")}
+                  aria-label={t("chat.rename")}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--fg-subtle)] opacity-100 hover:bg-[var(--surface-3)] hover:text-[var(--fg)] sm:opacity-0 sm:group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void renameChat(chat.id, chat.title);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
                 <button
                   type="button"
                   title={t("chat.delete")}
@@ -163,7 +243,7 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
               </li>
             );
           })}
-          {!chats.length ? (
+          {!sorted.length ? (
             <li className="px-3 py-2 text-xs text-[var(--fg-subtle)]">{t("chat.emptyChats")}</li>
           ) : null}
         </ul>
