@@ -60,27 +60,22 @@ export function PlatformSection() {
 
   return (
     <section className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-      <div className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-64 max-w-3xl bg-[radial-gradient(ellipse_at_top,rgba(59,130,246,0.18),transparent_70%)]" />
-
       <motion.div
-        initial={{ opacity: 0, y: 18 }}
+        initial={{ opacity: 0, y: 16 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.5 }}
-        className="relative mx-auto max-w-3xl text-center"
+        className="max-w-2xl"
       >
-        <p className="text-sm font-semibold tracking-[0.2em] text-[#60a5fa]">
-          {t("landing.platform.eyebrow")}
-        </p>
-        <h2 className="font-display mt-3 text-[clamp(1.75rem,4vw,2.75rem)] font-bold tracking-tight text-white">
-          {t("landing.platform.title")}
+        <h2 className="font-[family-name:var(--font-display)] text-[clamp(1.6rem,3.5vw,2.35rem)] font-bold tracking-tight text-[var(--landing-ink,#070b12)]">
+          {t("landing.features.title")}
         </h2>
-        <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-white/50 sm:text-base">
-          {t("landing.platform.subtitle")}
+        <p className="mt-3 text-[15px] leading-relaxed text-[var(--landing-muted,#5b6577)]">
+          {t("landing.features.subtitle")}
         </p>
       </motion.div>
 
-      <div className="relative mt-12 grid gap-px overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
         {modules.map((mod, i) => {
           const Icon = mod.icon;
           return (
@@ -105,20 +100,20 @@ export function PlatformSection() {
                     }
                   }
                 }}
-                className="group flex h-full flex-col bg-[#0a0a0c] p-6 transition hover:bg-[#101014] sm:p-7"
+                className="group block"
               >
                 <Icon
-                  className="h-5 w-5 text-[#60a5fa] transition group-hover:scale-110"
+                  className="h-5 w-5 text-[var(--landing-accent,#0f766e)] transition group-hover:translate-x-0.5"
                   strokeWidth={1.75}
                   aria-hidden
                 />
-                <h3 className="mt-4 text-[15px] font-semibold text-white">
+                <h3 className="mt-4 text-[16px] font-semibold text-[var(--landing-fg,#0b1220)]">
                   {t(mod.titleKey)}
                 </h3>
-                <p className="mt-2 flex-1 text-sm leading-relaxed text-white/45">
+                <p className="mt-2 text-sm leading-relaxed text-[var(--landing-muted,#5b6577)]">
                   {t(mod.bodyKey)}
                 </p>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-[#60a5fa] opacity-80 transition group-hover:opacity-100">
+                <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[var(--landing-accent,#0f766e)]">
                   {t("landing.platform.open")}
                   <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                 </span>
@@ -127,16 +122,6 @@ export function PlatformSection() {
           );
         })}
       </div>
-
-      <motion.p
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ delay: 0.2, duration: 0.45 }}
-        className="relative mx-auto mt-10 max-w-2xl text-center text-sm leading-relaxed text-white/40"
-      >
-        {t("landing.platform.note")}
-      </motion.p>
     </section>
   );
 }

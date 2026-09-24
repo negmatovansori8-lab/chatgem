@@ -45,7 +45,7 @@ export function Logo({
       {showWordmark ? (
         <span className="font-[family-name:var(--font-display)] text-[15px] font-bold tracking-tight text-[var(--fg)]">
           <span className="text-[var(--fg)]">Chat</span>
-          <span className="bg-gradient-to-r from-[#22D3EE] via-[#3B82F6] to-[#C026F3] bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-[#0f766e] via-[#0e7490] to-[#0369a1] bg-clip-text text-transparent">
             Gem
           </span>
         </span>

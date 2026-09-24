@@ -30,10 +30,10 @@ export function PricingSection() {
       <div className="mt-12 grid gap-4 lg:grid-cols-3 lg:gap-5">
         {plans.map((plan, index) => {
           const href =
-            plan.id === "free" ? "/app/chat" : plan.id === "pro" ? "/app/billing" : "/register";
+            plan.id === "free" ? "/login" : plan.id === "pro" ? "/app/billing" : "/register";
           const cta =
             plan.id === "free"
-              ? t("hero.ctaPrimary")
+              ? t("nav.signin")
               : plan.id === "pro"
                 ? t("billing.proCta")
                 : t("auth.register.cta");

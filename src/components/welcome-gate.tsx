@@ -34,51 +34,49 @@ export function WelcomeGate({ children }: { children: React.ReactNode }) {
   if (!onHome) return <>{children}</>;
 
   if (!ready) {
-    return <div className="min-h-dvh bg-[#050505]" aria-hidden />;
+    return <div className="min-h-dvh bg-[#eef1f4]" aria-hidden />;
   }
 
   if (!show) return <>{children}</>;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-[#050505] text-white">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_-20%,rgba(59,130,246,0.35),transparent_55%)]" />
-        <div className="absolute bottom-0 left-1/2 h-[40vh] w-[80vw] -translate-x-1/2 rounded-full bg-sky-500/10 blur-[100px]" />
+    <div className="fixed inset-0 z-[100] flex flex-col bg-[#eef1f4] text-[#0b1220]">
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 90% 70% at 20% 10%, rgba(15,118,110,0.22), transparent 55%), radial-gradient(ellipse 70% 50% at 90% 0%, rgba(14,165,233,0.14), transparent 50%)",
+          }}
+        />
       </div>
 
       <div className="relative flex flex-1 flex-col items-center justify-center px-6 pb-10 pt-16 text-center">
-        <div className="nj-rise grid h-[4.5rem] w-[4.5rem] place-items-center rounded-[1.35rem] bg-gradient-to-br from-[#60a5fa] via-[#3b82f6] to-[#1d4ed8] shadow-[0_24px_60px_-20px_rgba(59,130,246,0.85)]">
-          <span className="font-display text-3xl font-bold tracking-tight">C</span>
-        </div>
-
-        <h1 className="nj-rise nj-rise-delay-1 font-display mt-8 text-[clamp(2.4rem,8vw,3.75rem)] font-bold tracking-[-0.04em]">
+        <h1 className="nj-rise font-[family-name:var(--font-display)] text-[clamp(2.8rem,10vw,4.5rem)] font-bold tracking-[-0.05em] text-[#070b12]">
           ChatGem
         </h1>
-        <p className="nj-rise nj-rise-delay-2 mt-1 text-sm font-medium tracking-[0.28em] text-[#60a5fa]">
-          AI
-        </p>
-        <p className="nj-rise nj-rise-delay-3 mt-5 max-w-md text-[15px] leading-relaxed text-white/55 sm:text-base">
+        <p className="nj-rise nj-rise-delay-2 mt-5 max-w-md text-[15px] leading-relaxed text-[#5b6577] sm:text-base">
           {t("welcome.subtitle")}
         </p>
 
-        <div className="nj-rise nj-rise-delay-4 mt-8">
+        <div className="nj-rise nj-rise-delay-3 mt-8">
           <LanguageSwitcher />
         </div>
 
         <button
           type="button"
           onClick={enter}
-          className="nj-rise nj-rise-delay-5 mt-10 inline-flex min-h-12 w-full max-w-xs items-center justify-center rounded-full bg-white px-8 text-[15px] font-semibold text-black transition hover:bg-white/90 active:scale-[0.98]"
+          className="nj-rise nj-rise-delay-4 mt-10 inline-flex min-h-12 w-full max-w-xs items-center justify-center rounded-xl bg-[#070b12] px-8 text-[15px] font-semibold text-white transition hover:bg-[#141c2c] active:scale-[0.98]"
         >
-          {t("welcome.enter")}
+          {t("nav.signin")}
         </button>
 
         <Link
           href="/login"
           onClick={enter}
-          className="nj-rise nj-rise-delay-5 mt-4 text-sm text-white/40 transition hover:text-white/80"
+          className="nj-rise nj-rise-delay-4 mt-4 text-sm text-[#5b6577] transition hover:text-[#0b1220]"
         >
-          {t("nav.signin")}
+          {t("welcome.enter")}
         </Link>
       </div>
     </div>

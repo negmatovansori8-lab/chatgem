@@ -14,12 +14,12 @@ export function ChatPreviewSection({ embedded = false }: { embedded?: boolean })
       )}
     >
       <Link
-        href="/app/chat"
+        href="/login"
         className={cn(
           "group block overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#0c0c0e] shadow-[0_40px_100px_-50px_rgba(0,0,0,0.9)] transition hover:border-white/20 sm:rounded-[1.75rem]",
           embedded && "ring-1 ring-white/10",
         )}
-        aria-label={t("hero.ctaPrimary")}
+        aria-label={t("nav.signin")}
       >
         <div className="flex items-center gap-2 border-b border-white/8 px-4 py-3 sm:px-5">
           <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" aria-hidden />
@@ -28,8 +28,8 @@ export function ChatPreviewSection({ embedded = false }: { embedded?: boolean })
           <p className="ms-3 truncate text-xs font-medium text-white/40">
             ChatGem · {t("chat.chatBtn")}
           </p>
-          <span className="ms-auto text-[11px] font-medium text-[#60a5fa] opacity-0 transition group-hover:opacity-100">
-            {t("hero.ctaPrimary")} →
+          <span className="ms-auto text-[11px] font-medium text-[#5eead4] opacity-0 transition group-hover:opacity-100">
+            {t("nav.signin")} →
           </span>
         </div>
 

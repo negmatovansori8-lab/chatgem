@@ -11,25 +11,32 @@ export function FinalCtaSection() {
   return (
     <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 sm:pb-28">
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
+        initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.55 }}
-        className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0a0a0c] px-6 py-14 text-center sm:px-12 sm:py-16"
+        className="relative overflow-hidden rounded-2xl bg-[var(--landing-ink,#070b12)] px-6 py-14 sm:px-12 sm:py-16"
       >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.22),transparent_65%)]" />
-        <div className="relative">
-          <h2 className="font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-hidden
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 70% at 20% 0%, rgba(15,118,110,0.35), transparent 55%), radial-gradient(ellipse 60% 50% at 100% 80%, rgba(14,165,233,0.15), transparent 50%)",
+          }}
+        />
+        <div className="relative max-w-xl">
+          <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-white sm:text-4xl">
             {t("landing.cta.title")}
           </h2>
-          <p className="mx-auto mt-3 max-w-lg text-[15px] text-white/50">
+          <p className="mt-3 text-[15px] leading-relaxed text-white/55">
             {t("landing.cta.subtitle")}
           </p>
           <Link
-            href="/app/chat"
-            className="mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-8 text-[15px] font-semibold text-black transition hover:bg-white/90"
+            href="/login"
+            className="mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-7 text-[15px] font-semibold text-[var(--landing-ink,#070b12)] transition hover:bg-white/90"
           >
-            {t("hero.ctaPrimary")}
+            {t("nav.signin")}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
