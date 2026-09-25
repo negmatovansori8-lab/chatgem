@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { useI18n } from "@/components/i18n/locale-provider";
 
@@ -10,13 +9,7 @@ export function FinalCtaSection() {
 
   return (
     <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 sm:pb-28">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.55 }}
-        className="relative overflow-hidden rounded-2xl bg-[var(--landing-ink,#070b12)] px-6 py-14 sm:px-12 sm:py-16"
-      >
+      <div className="relative overflow-hidden rounded-2xl bg-[var(--landing-ink,#070b12)] px-6 py-14 sm:px-12 sm:py-16">
         <div
           className="pointer-events-none absolute inset-0"
           aria-hidden
@@ -40,7 +33,7 @@ export function FinalCtaSection() {
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-      </motion.div>
+      </div>
     </section>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
   ArrowRight,
   Bot,
@@ -60,32 +59,20 @@ export function PlatformSection() {
 
   return (
     <section className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.5 }}
-        className="max-w-2xl"
-      >
+      <div className="max-w-2xl">
         <h2 className="font-[family-name:var(--font-display)] text-[clamp(1.6rem,3.5vw,2.35rem)] font-bold tracking-tight text-[var(--landing-ink,#070b12)]">
           {t("landing.features.title")}
         </h2>
         <p className="mt-3 text-[15px] leading-relaxed text-[var(--landing-muted,#5b6577)]">
           {t("landing.features.subtitle")}
         </p>
-      </motion.div>
+      </div>
 
       <div className="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-        {modules.map((mod, i) => {
+        {modules.map((mod) => {
           const Icon = mod.icon;
           return (
-            <motion.div
-              key={mod.titleKey}
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-40px" }}
-              transition={{ delay: i * 0.04, duration: 0.4 }}
-            >
+            <div key={mod.titleKey}>
               <Link
                 href={mod.href}
                 onClick={() => {
@@ -102,12 +89,10 @@ export function PlatformSection() {
                 }}
                 className="group block"
               >
-                <Icon
-                  className="h-5 w-5 text-[var(--landing-accent,#0f766e)] transition group-hover:translate-x-0.5"
-                  strokeWidth={1.75}
-                  aria-hidden
-                />
-                <h3 className="mt-4 text-[16px] font-semibold text-[var(--landing-fg,#0b1220)]">
+                <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl bg-[var(--landing-ink,#070b12)]/5 text-[var(--landing-accent,#0f766e)] transition group-hover:bg-[var(--landing-accent,#0f766e)]/15">
+                  <Icon className="h-5 w-5" strokeWidth={1.75} />
+                </div>
+                <h3 className="text-lg font-semibold tracking-tight text-[var(--landing-ink,#070b12)]">
                   {t(mod.titleKey)}
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-[var(--landing-muted,#5b6577)]">
@@ -118,7 +103,7 @@ export function PlatformSection() {
                   <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                 </span>
               </Link>
-            </motion.div>
+            </div>
           );
         })}
       </div>

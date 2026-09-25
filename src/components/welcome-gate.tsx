@@ -33,8 +33,9 @@ export function WelcomeGate({ children }: { children: React.ReactNode }) {
 
   if (!onHome) return <>{children}</>;
 
+  // Never block the UI with a blank flash — show welcome or children immediately.
   if (!ready) {
-    return <div className="min-h-dvh bg-[#eef1f4]" aria-hidden />;
+    return <>{children}</>;
   }
 
   if (!show) return <>{children}</>;
