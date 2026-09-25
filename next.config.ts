@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
   poweredByHeader: false,
+  // Hide the floating Next.js "N" Dev Tools badge in local preview
+  devIndicators: false,
   images: {
     formats: ["image/avif", "image/webp"],
   },
