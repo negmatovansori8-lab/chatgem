@@ -671,21 +671,24 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-[var(--bg)] text-[var(--fg)]">
-      <header className="relative z-10 flex shrink-0 items-center justify-between gap-1.5 border-b border-[var(--border)] px-2 pb-1 pe-2 pt-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <AppMenuButton className="shrink-0" />
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:justify-center">
+      <header className="relative z-10 flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border)]/80 px-2 pb-1.5 pe-2 pt-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className="flex min-w-0 items-center gap-1">
+          <AppMenuButton className="shrink-0" />
+          {showTitle ? (
+            <p className="truncate text-sm font-medium text-[var(--fg-muted)] max-sm:max-w-[9rem]">
+              {title}
+            </p>
+          ) : (
+            <p className="truncate text-sm font-medium text-[var(--fg-muted)]">
+              ChatGem
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           <LanguageSwitcher compact />
           <ThemeToggle />
-          <Link
-            href="/app/billing"
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--accent)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--accent-fg)] shadow-[0_0_20px_var(--accent-glow)] sm:gap-1.5 sm:px-3.5 sm:text-[13px]"
-          >
-            <span className="text-sm leading-none">✦</span>
-            <span className="max-sm:hidden">{t("chat.upgradePro")}</span>
-            <span className="sm:hidden">Pro</span>
-          </Link>
+          <UserMenu compact />
         </div>
-        <UserMenu compact />
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 sm:px-4">
@@ -712,19 +715,72 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                 <p className="text-xs text-[var(--fg-subtle)]">{t("plugins.skillReady")}</p>
               </div>
             ) : (
-              <div className="mb-auto mt-16 flex w-full max-w-lg flex-col items-center gap-8 px-2">
-                <div className="text-center">
-                  <p className="font-display text-2xl font-semibold tracking-tight text-[var(--fg)] sm:text-3xl">
+              <div className="mb-auto mt-10 flex w-full max-w-2xl flex-col items-center gap-8 px-2 sm:mt-16">
+                <div className="flex flex-col items-center text-center">
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[linear-gradient(145deg,#3b82f6,#60a5fa)] shadow-[0_16px_40px_-18px_rgba(59,130,246,0.7)]">
+                    <span className="font-display text-2xl font-bold text-white">C</span>
+                  </div>
+                  <h1 className="font-display mt-5 text-2xl font-semibold tracking-tight text-[var(--fg)] sm:text-3xl">
                     ChatGem
-                  </p>
-                  <p className="mt-2 text-[15px] text-[var(--fg-muted)]">
-                    {t("chat.askAnything")}
+                  </h1>
+                  <p className="mt-2 max-w-md text-[15px] text-[var(--fg-muted)]">
+                    {t("chat.welcome")}
                   </p>
                 </div>
-                <div className="flex w-full max-w-md flex-col gap-3">
+
+                <div className="grid w-full max-w-xl grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  {(
+                    [
+                      {
+                        key: "explain",
+                        label: t("chat.suggest.explain"),
+                        action: () => {
+                          setInput(t("chat.suggest.explainPrompt") + " ");
+                          window.setTimeout(() => inputRef.current?.focus(), 0);
+                        },
+                      },
+                      {
+                        key: "code",
+                        label: t("chat.suggest.code"),
+                        action: () => {
+                          setInput(t("chat.suggest.codePrompt") + " ");
+                          window.setTimeout(() => inputRef.current?.focus(), 0);
+                        },
+                      },
+                      {
+                        key: "plan",
+                        label: t("chat.suggest.plan"),
+                        action: () => {
+                          setInput(t("chat.suggest.planPrompt") + " ");
+                          window.setTimeout(() => inputRef.current?.focus(), 0);
+                        },
+                      },
+                      {
+                        key: "image",
+                        label: t("chat.suggest.image"),
+                        action: () => {
+                          setImageMode(true);
+                          setInput("");
+                          window.setTimeout(() => inputRef.current?.focus(), 0);
+                        },
+                      },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={item.action}
+                      className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 text-left text-[14px] font-medium text-[var(--fg-muted)] transition hover:border-[var(--accent)]/35 hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex w-full max-w-md flex-col gap-1.5">
                   <button
                     type="button"
-                    className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[15px] text-[var(--fg-muted)] transition hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
+                    className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[14px] text-[var(--fg-subtle)] transition hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
                     onClick={() => {
                       setImageMode(true);
                       setInput("");
@@ -736,7 +792,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                   </button>
                   <button
                     type="button"
-                    className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[15px] text-[var(--fg-muted)] transition hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
+                    className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-[14px] text-[var(--fg-subtle)] transition hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
                     onClick={() => fileRef.current?.click()}
                   >
                     <Plus className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
@@ -747,10 +803,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
             )}
           </div>
         ) : (
-          <div className="mx-auto flex max-w-3xl flex-col gap-6 py-6 pb-8">
-            {showTitle ? (
-              <p className="text-center text-xs text-[var(--fg-subtle)]">{title}</p>
-            ) : null}
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 py-6 pb-10">
             {messages.map((message, index) => {
               const isLastAssistant =
                 message.role === "assistant" && index === messages.length - 1;
@@ -759,10 +812,10 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                 <div
                   key={message.id}
                   className={cn(
-                    "group max-w-[92%] text-[15px] leading-7",
+                    "group text-[15px] leading-7",
                     message.role === "user"
-                      ? "ml-auto rounded-[1.5rem] bg-[var(--surface-3)] px-4 py-3 text-[var(--fg)] shadow-[0_8px_30px_-20px_rgba(0,0,0,0.45)]"
-                      : "text-[var(--fg)]",
+                      ? "ml-auto max-w-[min(92%,42rem)] rounded-[1.35rem] bg-[var(--surface-3)] px-4 py-3 text-[var(--fg)]"
+                      : "w-full max-w-none text-[var(--fg)]",
                   )}
                 >
                   {message.role === "assistant" ? (

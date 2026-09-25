@@ -28,6 +28,7 @@ export function useChatList(query = "") {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
 
     void (async () => {
       const params = new URLSearchParams();

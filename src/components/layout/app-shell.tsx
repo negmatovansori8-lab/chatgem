@@ -11,15 +11,13 @@ import {
   useState,
 } from "react";
 import {
-  BookOpen,
-  Clock,
-  FolderKanban,
   ImageIcon,
   Menu,
+  MessageSquarePlus,
   Pencil,
   Pin,
-  Puzzle,
   Search,
+  Settings,
   Trash2,
   X,
 } from "lucide-react";
@@ -44,13 +42,14 @@ export function useAppSidebar() {
   return ctx;
 }
 
-const nav = [
-  { href: "/app/gallery", labelKey: "sidebar.images", icon: ImageIcon },
-  { href: "/app/knowledge", labelKey: "sidebar.library", icon: BookOpen },
-  { href: "/app/projects", labelKey: "sidebar.projects", icon: FolderKanban },
-  { href: "/app/agents", labelKey: "sidebar.scheduled", icon: Clock },
-  { href: "/app/tools", labelKey: "sidebar.plugins", icon: Puzzle },
-] as const;
+function useDebounced(value: string, ms = 220) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const id = window.setTimeout(() => setV(value), ms);
+    return () => window.clearTimeout(id);
+  }, [value, ms]);
+  return v;
+}
 
 function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -59,16 +58,16 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
   const toast = useToast();
   const { setOpen } = useAppSidebar();
   const [query, setQuery] = useState("");
-  const { chats, refresh, setChats } = useChatList(query);
+  const debouncedQuery = useDebounced(query);
+  const { chats, loading, refresh, setChats } = useChatList(debouncedQuery);
 
   useEffect(() => {
-    void refresh();
     const onChatsChanged = () => {
       void refresh();
     };
     window.addEventListener("nj:chats-changed", onChatsChanged);
     return () => window.removeEventListener("nj:chats-changed", onChatsChanged);
-  }, [pathname, refresh]);
+  }, [refresh]);
 
   async function deleteChat(id: string) {
     const res = await fetch(`/api/chats/${id}`, { method: "DELETE" });
@@ -120,31 +119,64 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
     window.dispatchEvent(new Event("nj:chats-changed"));
   }
 
-  const sorted = [...chats].sort((a, b) => {
-    const ap = a.pinned ? 1 : 0;
-    const bp = b.pinned ? 1 : 0;
-    if (ap !== bp) return bp - ap;
-    return 0;
-  });
+  const sorted = useMemo(() => {
+    return [...chats].sort((a, b) => {
+      const ap = a.pinned ? 1 : 0;
+      const bp = b.pinned ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      return 0;
+    });
+  }, [chats]);
 
   return (
     <div className="flex h-full flex-col bg-[var(--surface)] text-[var(--fg)]">
-      <div className="flex items-center justify-between gap-2 px-3 py-3 md:px-4">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--surface-3)] text-[var(--fg)] hover:bg-[var(--surface-2)]"
-            aria-label="Close menu"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <p className="truncate text-[17px] font-semibold tracking-tight">ChatGem</p>
-        </div>
+      {/* Brand + close */}
+      <div className="flex items-center gap-2 px-3 py-3">
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)] md:hidden"
+          aria-label="Close menu"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        <Link
+          href="/app/chat"
+          onClick={onNavigate}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1"
+        >
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[linear-gradient(145deg,#3b82f6,#60a5fa)] text-sm font-bold text-white">
+            C
+          </span>
+          <span className="truncate text-[15px] font-semibold tracking-tight">
+            ChatGem
+          </span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="hidden h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)] md:grid"
+          aria-label="Collapse sidebar"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
-      <div className="px-3 pb-2">
-        <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
+      {/* New chat — primary */}
+      <div className="px-2 pb-2">
+        <Link
+          href="/app/chat"
+          onClick={onNavigate}
+          className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-[14px] font-medium text-[var(--fg)] transition hover:bg-[var(--surface-3)]"
+        >
+          <MessageSquarePlus className="h-[18px] w-[18px] text-[var(--fg-muted)]" strokeWidth={1.75} />
+          {t("sidebar.newChat")}
+        </Link>
+      </div>
+
+      {/* Search chats */}
+      <div className="px-2 pb-2">
+        <label className="flex items-center gap-2 rounded-xl bg-[var(--surface-2)] px-3 py-2">
           <Search className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" />
           <input
             value={query}
@@ -155,111 +187,140 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
         </label>
       </div>
 
-      <nav className="space-y-0.5 px-2">
-        {nav.map((item) => {
-          const Icon = item.icon;
-          const active = pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium",
-                active
-                  ? "bg-[var(--surface-3)] text-[var(--fg)]"
-                  : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)]",
-              )}
-            >
-              <Icon className="h-[18px] w-[18px] opacity-90" strokeWidth={1.75} />
-              {t(item.labelKey)}
-            </Link>
-          );
-        })}
+      {/* Compact tools */}
+      <nav className="space-y-0.5 px-2 pb-2">
+        <Link
+          href="/app/gallery"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[14px] font-medium transition",
+            pathname.startsWith("/app/gallery") || pathname.startsWith("/app/images")
+              ? "bg-[var(--surface-3)] text-[var(--fg)]"
+              : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
+          )}
+        >
+          <ImageIcon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+          {t("sidebar.images")}
+        </Link>
       </nav>
 
-      <div className="mx-4 my-3 h-px bg-[var(--border)]" />
+      <div className="mx-3 mb-1 h-px bg-[var(--border)]" />
 
+      <p className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--fg-subtle)]">
+        {t("sidebar.chats")}
+      </p>
+
+      {/* Real history */}
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+        {loading && !sorted.length ? (
+          <div className="space-y-2 px-1 py-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-9 animate-pulse rounded-xl bg-[var(--surface-2)]"
+              />
+            ))}
+          </div>
+        ) : null}
+
         <ul className="space-y-0.5">
-          {sorted.slice(0, 40).map((chat) => {
+          {sorted.slice(0, 50).map((chat) => {
             const active = pathname === `/app/chat/${chat.id}`;
             return (
-              <li key={chat.id} className="group flex items-center gap-0.5">
+              <li key={chat.id} className="group relative flex items-center">
                 <Link
                   href={`/app/chat/${chat.id}`}
                   onClick={onNavigate}
                   className={cn(
-                    "min-w-0 flex-1 truncate rounded-xl px-3 py-2.5 text-[14px]",
+                    "min-w-0 flex-1 truncate rounded-xl py-2 pe-20 ps-3 text-[13.5px] leading-snug transition",
                     active
                       ? "bg-[var(--surface-3)] text-[var(--fg)]"
-                      : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)]",
+                      : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
                   )}
                 >
                   {chat.pinned ? (
-                    <Pin className="me-1.5 inline h-3 w-3 text-[var(--accent)]" />
+                    <Pin className="me-1.5 inline h-3 w-3 -translate-y-px text-[var(--accent)]" />
                   ) : null}
-                  {chat.title}
+                  {chat.title || t("chat.newChat")}
                 </Link>
-                <button
-                  type="button"
-                  title={t("chat.pin")}
-                  aria-label={t("chat.pin")}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--fg-subtle)] opacity-100 hover:bg-[var(--surface-3)] hover:text-[var(--fg)] sm:opacity-0 sm:group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    void togglePin(chat.id, Boolean(chat.pinned));
-                  }}
-                >
-                  <Pin className={cn("h-3.5 w-3.5", chat.pinned && "text-[var(--accent)]")} />
-                </button>
-                <button
-                  type="button"
-                  title={t("chat.rename")}
-                  aria-label={t("chat.rename")}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--fg-subtle)] opacity-100 hover:bg-[var(--surface-3)] hover:text-[var(--fg)] sm:opacity-0 sm:group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    void renameChat(chat.id, chat.title);
-                  }}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  title={t("chat.delete")}
-                  aria-label={t("chat.delete")}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--fg-subtle)] hover:bg-red-500/15 hover:text-red-400"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    void deleteChat(chat.id);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                <div className="absolute end-1 flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                  <button
+                    type="button"
+                    title={t("chat.pin")}
+                    aria-label={t("chat.pin")}
+                    className="grid h-7 w-7 place-items-center rounded-md text-[var(--fg-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void togglePin(chat.id, Boolean(chat.pinned));
+                    }}
+                  >
+                    <Pin
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        chat.pinned && "fill-[var(--accent)] text-[var(--accent)]",
+                      )}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    title={t("chat.rename")}
+                    aria-label={t("chat.rename")}
+                    className="grid h-7 w-7 place-items-center rounded-md text-[var(--fg-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void renameChat(chat.id, chat.title);
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title={t("chat.delete")}
+                    aria-label={t("chat.delete")}
+                    className="grid h-7 w-7 place-items-center rounded-md text-[var(--fg-subtle)] hover:bg-red-500/15 hover:text-red-400"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void deleteChat(chat.id);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </li>
             );
           })}
-          {!sorted.length ? (
-            <li className="px-3 py-2 text-xs text-[var(--fg-subtle)]">{t("chat.emptyChats")}</li>
+          {!loading && !sorted.length ? (
+            <li className="px-3 py-6 text-center text-xs leading-relaxed text-[var(--fg-subtle)]">
+              {t("chat.emptyChats")}
+            </li>
           ) : null}
         </ul>
       </div>
 
-      <div className="flex items-center gap-2 border-t border-[var(--border)] p-3">
+      {/* Settings + profile — ChatGPT bottom bar */}
+      <div className="space-y-1 border-t border-[var(--border)] p-2">
         <Link
-          href="/app/chat"
-          onClick={() => onNavigate?.()}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-4 py-3 text-[15px] font-semibold text-[var(--accent-fg)]"
+          href="/app/profile"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[14px] font-medium transition",
+            pathname.startsWith("/app/profile") || pathname.startsWith("/app/settings")
+              ? "bg-[var(--surface-3)] text-[var(--fg)]"
+              : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
+          )}
         >
-          <Pencil className="h-4 w-4" />
-          {t("chat.chatBtn")}
+          <Settings className="h-[18px] w-[18px]" strokeWidth={1.75} />
+          {t("sidebar.settings")}
         </Link>
-        <ThemeToggle />
-        <UserMenu compact />
+        <div className="flex items-center gap-1 rounded-xl px-1 py-1">
+          <div className="min-w-0 flex-1">
+            <UserMenu />
+          </div>
+          <ThemeToggle />
+        </div>
       </div>
     </div>
   );
@@ -272,7 +333,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const value = useMemo(() => ({ open, setOpen, toggle }), [open, toggle]);
 
   useEffect(() => {
-    // Desktop: open once on first load (except image gallery — needs full width)
     if (window.matchMedia("(min-width: 768px)").matches) {
       const isGallery =
         window.location.pathname.startsWith("/app/gallery") ||
@@ -282,7 +342,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Mobile: close after route change. Gallery: keep closed on desktop too.
     const mobile = window.matchMedia("(max-width: 767px)").matches;
     const isGallery =
       pathname.startsWith("/app/gallery") || pathname.startsWith("/app/images");
@@ -294,20 +353,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <SidebarContext.Provider value={value}>
       <div className="relative flex h-dvh max-h-dvh min-h-0 overflow-hidden bg-[var(--bg)] text-[var(--fg)] supports-[height:100dvh]:h-dvh">
-        {/* Backdrop (mobile) */}
         <div
           className={cn(
-            "fixed inset-0 z-[55] bg-black/55 transition-opacity md:hidden",
+            "fixed inset-0 z-[55] bg-black/50 transition-opacity md:hidden",
             open ? "opacity-100" : "pointer-events-none opacity-0",
           )}
           onClick={() => setOpen(false)}
           aria-hidden={!open}
         />
 
-        {/* Меню — бе се хат */}
         <aside
           className={cn(
-            "fixed inset-y-0 start-0 z-[60] flex w-[min(88vw,20rem)] flex-col border-e border-[var(--border)] bg-[var(--surface)] shadow-2xl transition-transform duration-300 ease-out pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
+            "fixed inset-y-0 start-0 z-[60] flex w-[min(86vw,17.5rem)] flex-col border-e border-[var(--border)] bg-[var(--surface)] transition-transform duration-250 ease-out pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] md:w-[17.5rem]",
             open ? "translate-x-0" : "-translate-x-full",
           )}
         >
@@ -320,11 +377,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
         </aside>
 
-        {/* Desktop spacer */}
         <div
           className={cn(
-            "hidden shrink-0 transition-[width] duration-300 md:block",
-            open ? "w-[19rem]" : "w-0",
+            "hidden shrink-0 transition-[width] duration-250 md:block",
+            open ? "w-[17.5rem]" : "w-0",
           )}
           aria-hidden
         />
@@ -342,15 +398,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * ≡ on the page only when the sidebar is CLOSED.
- * When OPEN, close with X inside the sidebar (ChatGPT-style).
- */
 export function AppMenuButton({ className }: { className?: string }) {
   const { open, setOpen } = useAppSidebar();
 
   if (open) {
-    // Keep layout space so the title does not jump
     return <div className={cn("h-10 w-10 shrink-0", className)} aria-hidden />;
   }
 
