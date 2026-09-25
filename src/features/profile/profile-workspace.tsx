@@ -19,8 +19,6 @@ import {
   LayoutGrid,
   LogOut,
   Mail,
-  Megaphone,
-  MonitorSmartphone,
   Pencil,
   Settings,
   Shield,
@@ -98,11 +96,10 @@ function applyAccent(color: string) {
 }
 
 function initialsFrom(name?: string | null, email?: string | null) {
-  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  if (parts.length === 1 && parts[0].length >= 2)
-    return parts[0].slice(0, 2).toUpperCase();
-  return (email || "CG").trim().slice(0, 2).toUpperCase();
+  // Brand mark — never show personal-name letters in the compact app chrome.
+  void name;
+  void email;
+  return "C";
 }
 
 function Avatar({
@@ -123,7 +120,7 @@ function Avatar({
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={user.image}
-        alt={user.name}
+        alt={user.name || "ChatGem"}
         className={cn("rounded-full object-cover", dim)}
       />
     );
@@ -131,11 +128,12 @@ function Avatar({
   return (
     <div
       className={cn(
-        "grid place-items-center rounded-full bg-[#7c3aed] font-semibold text-white",
+        "grid place-items-center rounded-full bg-[linear-gradient(145deg,#3b82f6,#60a5fa)] font-semibold text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)]",
         dim,
       )}
+      aria-hidden
     >
-      {initialsFrom(user?.name, user?.email)}
+      C
     </div>
   );
 }
@@ -828,6 +826,16 @@ export function ProfileWorkspace() {
             <ChevronRight className="h-4 w-4 text-[var(--fg-subtle)]" />
           </button>
         </Card>
+        <Card>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between text-[15px]"
+            onClick={() => setPanel("age")}
+          >
+            {t("profile.ageVerify")}
+            <ChevronRight className="h-4 w-4 text-[var(--fg-subtle)]" />
+          </button>
+        </Card>
       </PanelShell>
     );
   }
@@ -1090,11 +1098,11 @@ export function ProfileWorkspace() {
     );
   }
 
-  /* ---------- MAIN ---------- */
+  /* ---------- MAIN (ChatGPT-style Settings) ---------- */
 
   return (
     <div className="mx-auto min-h-full max-w-lg bg-[var(--bg)] px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] text-[var(--fg)]">
-      <header className="mb-2 flex items-center">
+      <header className="mb-6 flex items-center gap-2">
         <button
           type="button"
           onClick={() => router.back()}
@@ -1103,25 +1111,32 @@ export function ProfileWorkspace() {
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
         </button>
+        <h1 className="flex-1 truncate text-center text-[17px] font-semibold pe-10">
+          {t("settings.title")}
+        </h1>
       </header>
 
-      <div className="mb-8 flex flex-col items-center">
-        <div className="relative">
-          <Avatar user={user} size="xl" />
-          <button
-            type="button"
-            onClick={() => setPanel("personalization")}
-            className="absolute -bottom-0.5 -end-0.5 grid h-8 w-8 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] shadow-sm"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
+      <div className="mb-6 flex items-center gap-3.5 px-1">
+        <button
+          type="button"
+          onClick={() => setPanel("personalization")}
+          className="relative shrink-0"
+        >
+          <Avatar user={user} size="lg" />
+          <span className="absolute -bottom-0.5 -end-0.5 grid h-6 w-6 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)]">
+            <Pencil className="h-3 w-3" />
+          </span>
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[17px] font-semibold">{displayName}</p>
+          <p className="truncate text-[13px] text-[var(--fg-subtle)]">
+            {user?.email || t("profile.emailGuest")}
+          </p>
         </div>
-        <h1 className="mt-4 max-w-[90%] truncate text-center text-[22px] font-semibold">
-          {displayName}
-        </h1>
       </div>
 
-      <SettingsGroup title={t("profile.myApp")}>
+      {/* ChatGPT: Personalization + Memory first */}
+      <SettingsGroup>
         <SettingsRow
           icon={Smile}
           label={t("profile.personalization")}
@@ -1132,27 +1147,23 @@ export function ProfileWorkspace() {
           label={t("sidebar.memory")}
           subtitle={memoryOn ? t("memory.enabled") : t("memory.disabled")}
           onClick={() => setPanel("memory")}
-        />
-        <SettingsRow
-          icon={LayoutGrid}
-          label={t("sidebar.plugins")}
-          onClick={() => setPanel("plugins")}
           last
         />
       </SettingsGroup>
 
+      {/* ChatGPT: Account */}
       <SettingsGroup title={t("settings.account")}>
-        <SettingsRow
-          icon={Briefcase}
-          label={t("profile.workspace")}
-          subtitle={planLabel}
-          onClick={() => setPanel("workspace")}
-        />
         <SettingsRow
           icon={Sparkles}
           label={t("profile.changePlan")}
           onClick={() => setPanel("plan")}
           accent
+        />
+        <SettingsRow
+          icon={Briefcase}
+          label={t("profile.workspace")}
+          subtitle={planLabel}
+          onClick={() => setPanel("workspace")}
         />
         <SettingsRow
           icon={BarChart3}
@@ -1170,22 +1181,12 @@ export function ProfileWorkspace() {
           label={t("profile.email")}
           subtitle={user?.email || t("profile.emailGuest")}
           onClick={() => setPanel("email")}
-        />
-        <SettingsRow
-          icon={Shield}
-          label={t("profile.ageVerify")}
-          onClick={() => setPanel("age")}
           last
         />
       </SettingsGroup>
 
+      {/* ChatGPT settings categories */}
       <SettingsGroup>
-        <SettingsRow
-          icon={Sun}
-          label={t("settings.appearance")}
-          subtitle={accentLabel}
-          onClick={() => setPanel("appearance")}
-        />
         <SettingsRow
           icon={Settings}
           label={t("settings.general")}
@@ -1196,6 +1197,12 @@ export function ProfileWorkspace() {
           label={t("settings.notifications")}
           subtitle={prefs.notificationsOn ? t("profile.parentalOn") : t("profile.parentalOff")}
           onClick={() => setPanel("notifications")}
+        />
+        <SettingsRow
+          icon={Sun}
+          label={t("settings.appearance")}
+          subtitle={accentLabel}
+          onClick={() => setPanel("appearance")}
         />
         <SettingsRow
           icon={AudioLines}
@@ -1213,9 +1220,9 @@ export function ProfileWorkspace() {
           onClick={() => setPanel("security")}
         />
         <SettingsRow
-          icon={MonitorSmartphone}
-          label={t("settings.remote")}
-          onClick={() => setPanel("remote")}
+          icon={Database}
+          label={t("settings.data")}
+          onClick={() => setPanel("data")}
         />
         <SettingsRow
           icon={HardDrive}
@@ -1223,14 +1230,9 @@ export function ProfileWorkspace() {
           onClick={() => setPanel("storage")}
         />
         <SettingsRow
-          icon={Database}
-          label={t("settings.data")}
-          onClick={() => setPanel("data")}
-        />
-        <SettingsRow
-          icon={Megaphone}
-          label={t("settings.ads")}
-          onClick={() => setPanel("ads")}
+          icon={LayoutGrid}
+          label={t("sidebar.plugins")}
+          onClick={() => setPanel("plugins")}
         />
         <SettingsRow
           icon={Bug}
