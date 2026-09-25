@@ -16,12 +16,29 @@
   --accent-glow: color-mix(in oklab, var(--accent) 50%, transparent);
   --ring: #2563eb;
   --danger: #f87171;
+  --success: #34d399;
   --grid-line: color-mix(in oklab, #ffffff 5%, transparent);
   --font-sans: var(--font-body);
   --font-display: var(--font-display);
   --composer: #1a1a1d;
   --pill: #ffffff;
   --pill-fg: #0a0a0a;
+  /* Design system */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px color-mix(in oklab, #000 35%, transparent);
+  --shadow-md: 0 8px 24px -12px color-mix(in oklab, #000 55%, transparent);
+  --shadow-lg: 0 24px 48px -24px color-mix(in oklab, #000 65%, transparent);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
 }
 
 .light {
@@ -40,10 +57,14 @@
   --accent-glow: color-mix(in oklab, var(--accent) 35%, transparent);
   --ring: #2563eb;
   --danger: #ff3b30;
+  --success: #34c759;
   --grid-line: color-mix(in oklab, #0a0a0a 6%, transparent);
   --composer: #ffffff;
   --pill: #0a0a0a;
   --pill-fg: #ffffff;
+  --shadow-sm: 0 1px 2px color-mix(in oklab, #000 8%, transparent);
+  --shadow-md: 0 8px 24px -12px color-mix(in oklab, #000 18%, transparent);
+  --shadow-lg: 0 24px 48px -24px color-mix(in oklab, #000 22%, transparent);
 }
 
 .dark {
@@ -62,6 +83,7 @@
   --accent-glow: color-mix(in oklab, var(--accent) 50%, transparent);
   --ring: #2563eb;
   --danger: #f87171;
+  --success: #34d399;
   --grid-line: color-mix(in oklab, #ffffff 5%, transparent);
   --composer: #1a1a1d;
   --pill: #ffffff;
@@ -101,6 +123,7 @@ body {
   min-height: -webkit-fill-available;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
   padding:
     env(safe-area-inset-top, 0)
     env(safe-area-inset-right, 0)

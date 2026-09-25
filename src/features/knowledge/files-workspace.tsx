@@ -64,8 +64,8 @@ export function FilesWorkspace() {
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 max-w-lg flex-col bg-black text-white">
-      <header className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+    <div className="mx-auto flex h-full min-h-0 max-w-lg flex-col bg-[var(--bg)] text-[var(--fg)]">
+      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <AppBackButton className="max-w-[7rem]" />
         <h1 className="flex-1 text-center text-[17px] font-semibold">
           {t("files.title")}
@@ -74,7 +74,7 @@ export function FilesWorkspace() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
-        <p className="mb-4 text-center text-sm text-white/45">{t("files.subtitle")}</p>
+        <p className="mb-4 text-center text-sm text-[var(--fg-muted)]">{t("files.subtitle")}</p>
 
         <button
           type="button"
@@ -98,7 +98,7 @@ export function FilesWorkspace() {
             "mb-5 flex w-full flex-col items-center gap-2 rounded-2xl border border-dashed px-4 py-8 transition disabled:opacity-50",
             dragOver
               ? "border-[var(--accent)] bg-[var(--accent)]/10"
-              : "border-white/15 bg-[#1a1a1a]",
+              : "border-[var(--border)] bg-[var(--surface)]",
           )}
         >
           <input
@@ -108,22 +108,22 @@ export function FilesWorkspace() {
             accept=".pdf,.txt,.doc,.docx,.md,.json,image/*,text/*,.js,.ts,.tsx,.py,.css,.html"
             onChange={(e) => void onUpload(e.target.files)}
           />
-          <Upload className="h-7 w-7 text-white/50" />
+          <Upload className="h-7 w-7 text-[var(--fg-subtle)]" />
           <span className="text-[15px] font-medium">
             {uploading ? t("files.uploading") : t("files.upload")}
           </span>
-          <span className="text-xs text-white/35">{t("files.formats")}</span>
-          <span className="text-[11px] text-white/30">{t("gallery.drop")}</span>
+          <span className="text-xs text-[var(--fg-subtle)]">{t("files.formats")}</span>
+          <span className="text-[11px] text-[var(--fg-subtle)]">{t("gallery.drop")}</span>
         </button>
-        {error ? <p className="mb-3 text-center text-xs text-red-400">{error}</p> : null}
+        {error ? <p className="mb-3 text-center text-xs text-[var(--danger)]">{error}</p> : null}
 
         {!files.length ? (
-          <p className="py-6 text-center text-sm text-white/35">{t("files.empty")}</p>
+          <p className="py-6 text-center text-sm text-[var(--fg-subtle)]">{t("files.empty")}</p>
         ) : null}
 
         <ul className="space-y-2">
           {files.map((file) => (
-            <li key={file.id} className="flex items-center gap-2 rounded-2xl bg-[#1a1a1a] p-2">
+            <li key={file.id} className="flex items-center gap-2 rounded-2xl bg-[var(--surface)] p-2">
               <button
                 type="button"
                 onClick={() => setSelected(file)}
@@ -134,14 +134,14 @@ export function FilesWorkspace() {
                 </div>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-medium">{file.name}</span>
-                  <span className="block text-[11px] text-white/35">
+                  <span className="block text-[11px] text-[var(--fg-subtle)]">
                     {file.status} · {(file.size / 1024).toFixed(1)} KB
                   </span>
                 </span>
               </button>
               <button
                 type="button"
-                className="grid h-10 w-10 place-items-center text-white/35 hover:text-red-400"
+                className="grid h-10 w-10 place-items-center text-[var(--fg-subtle)] hover:text-[var(--danger)]"
                 onClick={() => void onDelete(file.id)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -151,12 +151,12 @@ export function FilesWorkspace() {
         </ul>
 
         {selected ? (
-          <div className="mt-5 rounded-2xl bg-[#1a1a1a] p-4">
+          <div className="mt-5 rounded-2xl bg-[var(--surface)] p-4">
             <h2 className="mb-2 text-[15px] font-semibold">{selected.name}</h2>
-            <p className="mb-3 text-[11px] text-white/35">
+            <p className="mb-3 text-[11px] text-[var(--fg-subtle)]">
               {selected.mimeType} · {selected.status}
             </p>
-            <pre className="max-h-[40vh] overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-white/60">
+            <pre className="max-h-[40vh] overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-[var(--fg-muted)]">
               {selected.extractedText || t("files.noText")}
             </pre>
           </div>

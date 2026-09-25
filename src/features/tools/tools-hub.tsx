@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Calculator,
-  ChevronDown,
   ChevronRight,
   Code2,
   FileText,
@@ -125,13 +124,9 @@ export function ToolsHubWorkspace() {
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <button
-          type="button"
-          className="flex flex-1 items-center justify-center gap-1 text-[17px] font-semibold text-[var(--fg)]"
-        >
+        <h1 className="flex-1 text-center text-[17px] font-semibold text-[var(--fg)]">
           {t("plugins.title")}
-          <ChevronDown className="h-4 w-4 text-[var(--fg-subtle)]" />
-        </button>
+        </h1>
         <div className="w-10" />
       </header>
 

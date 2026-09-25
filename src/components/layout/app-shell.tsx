@@ -11,11 +11,15 @@ import {
   useState,
 } from "react";
 import {
+  AudioLines,
+  FolderOpen,
   ImageIcon,
   Menu,
   MessageSquarePlus,
   Pencil,
   Pin,
+  BookOpen,
+  Puzzle,
   Search,
   Settings,
   Trash2,
@@ -189,19 +193,34 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Compact tools */}
       <nav className="space-y-0.5 px-2 pb-2">
-        <Link
-          href="/app/gallery"
-          onClick={onNavigate}
-          className={cn(
-            "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[14px] font-medium transition",
-            pathname.startsWith("/app/gallery") || pathname.startsWith("/app/images")
-              ? "bg-[var(--surface-3)] text-[var(--fg)]"
-              : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
-          )}
-        >
-          <ImageIcon className="h-[18px] w-[18px]" strokeWidth={1.75} />
-          {t("sidebar.images")}
-        </Link>
+        {(
+          [
+            { href: "/app/gallery", labelKey: "sidebar.images", icon: ImageIcon },
+            { href: "/app/files", labelKey: "sidebar.files", icon: FolderOpen },
+            { href: "/app/knowledge", labelKey: "sidebar.library", icon: BookOpen },
+            { href: "/app/voice", labelKey: "sidebar.voice", icon: AudioLines },
+            { href: "/app/tools", labelKey: "sidebar.plugins", icon: Puzzle },
+          ] as const
+        ).map((item) => {
+          const Icon = item.icon;
+          const active = pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onNavigate}
+              className={cn(
+                "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[14px] font-medium transition",
+                active
+                  ? "bg-[var(--surface-3)] text-[var(--fg)]"
+                  : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
+              )}
+            >
+              <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+              {t(item.labelKey)}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="mx-3 mb-1 h-px bg-[var(--border)]" />
@@ -333,6 +352,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const value = useMemo(() => ({ open, setOpen, toggle }), [open, toggle]);
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem("nj_sidebar_open");
+      if (saved === "0" || saved === "1") {
+        if (window.matchMedia("(min-width: 768px)").matches) {
+          setOpen(saved === "1");
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
     if (window.matchMedia("(min-width: 768px)").matches) {
       const isGallery =
         window.location.pathname.startsWith("/app/gallery") ||
@@ -340,6 +370,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setOpen(!isGallery);
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      if (window.matchMedia("(min-width: 768px)").matches) {
+        localStorage.setItem("nj_sidebar_open", open ? "1" : "0");
+      }
+    } catch {
+      // ignore
+    }
+  }, [open]);
 
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 767px)").matches;
