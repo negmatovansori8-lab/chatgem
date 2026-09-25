@@ -95,13 +95,6 @@ function applyAccent(color: string) {
   document.documentElement.style.setProperty("--ring", color);
 }
 
-function initialsFrom(name?: string | null, email?: string | null) {
-  // Brand mark — never show personal-name letters in the compact app chrome.
-  void name;
-  void email;
-  return "C";
-}
-
 function Avatar({
   user,
   size = "lg",
@@ -111,10 +104,10 @@ function Avatar({
 }) {
   const dim =
     size === "xl"
-      ? "h-24 w-24 text-[2rem]"
+      ? "h-24 w-24"
       : size === "lg"
-        ? "h-14 w-14 text-xl"
-        : "h-9 w-9 text-sm";
+        ? "h-14 w-14"
+        : "h-9 w-9";
   if (user?.image) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -126,15 +119,12 @@ function Avatar({
     );
   }
   return (
-    <div
-      className={cn(
-        "grid place-items-center rounded-full bg-[linear-gradient(145deg,#3b82f6,#60a5fa)] font-semibold text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)]",
-        dim,
-      )}
-      aria-hidden
-    >
-      C
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/chatgem-logo.png"
+      alt="ChatGem"
+      className={cn("rounded-full object-cover object-top bg-black", dim)}
+    />
   );
 }
 

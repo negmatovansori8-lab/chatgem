@@ -43,10 +43,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/chatgem-logo.png", type: "image/png" },
       { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
     ],
-    apple: [{ url: "/favicon-32.png", type: "image/png" }],
+    apple: [{ url: "/chatgem-logo.png", type: "image/png" }],
   },
 };
 

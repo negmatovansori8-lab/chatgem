@@ -717,8 +717,13 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
             ) : (
               <div className="mb-auto mt-10 flex w-full max-w-2xl flex-col items-center gap-8 px-2 sm:mt-16">
                 <div className="flex flex-col items-center text-center">
-                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[linear-gradient(145deg,#3b82f6,#60a5fa)] shadow-[0_16px_40px_-18px_rgba(59,130,246,0.7)]">
-                    <span className="font-display text-2xl font-bold text-white">C</span>
+                  <div className="relative h-16 w-16 overflow-hidden rounded-2xl bg-black shadow-[0_16px_40px_-18px_rgba(59,130,246,0.7)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/chatgem-logo.png"
+                      alt="ChatGem"
+                      className="h-full w-full object-cover object-top"
+                    />
                   </div>
                   <h1 className="font-display mt-5 text-2xl font-semibold tracking-tight text-[var(--fg)] sm:text-3xl">
                     ChatGem

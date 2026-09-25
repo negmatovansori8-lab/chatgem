@@ -49,9 +49,14 @@ export function RegisterForm() {
       <div className="flex flex-1 flex-col items-center justify-center px-6 pt-16">
         <Link
           href="/"
-          className="grid h-14 w-14 place-items-center rounded-2xl bg-[linear-gradient(145deg,#3b82f6,#60a5fa)]"
+          className="relative grid h-14 w-14 place-items-center overflow-hidden rounded-2xl bg-black"
         >
-          <span className="font-display text-xl font-bold">C</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/chatgem-logo.png"
+            alt="ChatGem"
+            className="h-full w-full object-cover object-top"
+          />
         </Link>
         <h1 className="font-display mt-4 text-2xl font-bold">{t("auth.register.title")}</h1>
         <p className="mt-1 max-w-sm text-center text-sm text-white/50">

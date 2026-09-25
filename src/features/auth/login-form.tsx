@@ -69,9 +69,14 @@ export function LoginForm() {
         <div className="flex w-full max-w-md flex-col items-center animate-auth-rise">
           <Link
             href="/"
-            className="grid h-16 w-16 place-items-center rounded-2xl bg-[linear-gradient(145deg,#3b82f6,#60a5fa)] shadow-[0_20px_50px_-20px_rgba(59,130,246,0.7)]"
+            className="relative grid h-16 w-16 place-items-center overflow-hidden rounded-2xl bg-black shadow-[0_20px_50px_-20px_rgba(59,130,246,0.7)]"
           >
-            <span className="font-display text-2xl font-bold text-white">C</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/chatgem-logo.png"
+              alt="ChatGem"
+              className="h-full w-full object-cover object-top"
+            />
           </Link>
           <h1 className="font-display mt-5 text-3xl font-bold tracking-tight">ChatGem</h1>
           <p className="mt-1 text-sm text-white/50">AI</p>

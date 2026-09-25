@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useChatList } from "@/features/chat/use-chat-api";
 import { UserMenu } from "@/features/profile/profile-workspace";
+import { BrandMark } from "@/components/brand/brand-mark";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useToast } from "@/components/ui/toast";
@@ -149,9 +150,7 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
           onClick={onNavigate}
           className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1"
         >
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[linear-gradient(145deg,#3b82f6,#60a5fa)] text-sm font-bold text-white">
-            C
-          </span>
+          <BrandMark size="sm" className="rounded-xl" />
           <span className="truncate text-[15px] font-semibold tracking-tight">
             ChatGem
           </span>
