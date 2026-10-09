@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandMark, BrandWordmark } from "@/components/brand/brand-mark";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { useI18n } from "@/components/i18n/locale-provider";
 
@@ -41,43 +42,44 @@ export function WelcomeGate({ children }: { children: React.ReactNode }) {
   if (!show) return <>{children}</>;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-[#eef1f4] text-[#0b1220]">
+    <div className="fixed inset-0 z-[100] flex flex-col bg-[#f4f4f2] text-[#0c0c0e]">
       <div className="pointer-events-none absolute inset-0" aria-hidden>
         <div
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(ellipse 90% 70% at 20% 10%, rgba(15,118,110,0.22), transparent 55%), radial-gradient(ellipse 70% 50% at 90% 0%, rgba(14,165,233,0.14), transparent 50%)",
+              "radial-gradient(ellipse 90% 70% at 20% 10%, rgba(15,118,110,0.16), transparent 55%), radial-gradient(ellipse 70% 50% at 90% 0%, rgba(13,148,136,0.1), transparent 50%)",
           }}
         />
       </div>
 
       <div className="relative flex flex-1 flex-col items-center justify-center px-6 pb-10 pt-16 text-center">
-        <h1 className="nj-rise font-[family-name:var(--font-display)] text-[clamp(2.8rem,10vw,4.5rem)] font-bold tracking-[-0.05em] text-[#070b12]">
-          ChatGem
+        <BrandMark tile="light" animate="intro" className="h-20 w-20 sm:h-24 sm:w-24" />
+        <h1 className="mt-6 text-[clamp(2.6rem,9vw,4rem)] [--fg:#09090b]">
+          <BrandWordmark />
         </h1>
-        <p className="nj-rise nj-rise-delay-2 mt-5 max-w-md text-[15px] leading-relaxed text-[#5b6577] sm:text-base">
+        <p className="mt-5 max-w-md text-[15px] leading-relaxed text-[#52525b] sm:text-base">
           {t("welcome.subtitle")}
         </p>
 
-        <div className="nj-rise nj-rise-delay-3 mt-8">
+        <div className="mt-8">
           <LanguageSwitcher />
         </div>
 
         <button
           type="button"
           onClick={enter}
-          className="nj-rise nj-rise-delay-4 mt-10 inline-flex min-h-12 w-full max-w-xs items-center justify-center rounded-xl bg-[#070b12] px-8 text-[15px] font-semibold text-white transition hover:bg-[#141c2c] active:scale-[0.98]"
+          className="mt-10 inline-flex min-h-12 w-full max-w-xs items-center justify-center rounded-[var(--radius-md)] bg-[#09090b] px-8 text-[15px] font-semibold text-white transition hover:opacity-90 active:scale-[0.98]"
         >
-          {t("nav.signin")}
+          {t("welcome.enter")}
         </button>
 
         <Link
           href="/login"
           onClick={enter}
-          className="nj-rise nj-rise-delay-4 mt-4 text-sm text-[#5b6577] transition hover:text-[#0b1220]"
+          className="mt-4 text-sm font-medium text-[#52525b] transition hover:text-[#0c0c0e]"
         >
-          {t("welcome.enter")}
+          {t("nav.signin")} →
         </Link>
       </div>
     </div>

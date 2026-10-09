@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestUserId } from "@/server/session";
+import { isAccentId } from "@/lib/accent";
 import { prefsRepository, type UserPrefs } from "@/repositories/prefs-repository";
 
 export async function GET() {
@@ -37,12 +38,14 @@ export async function PATCH(req: Request) {
     "pluginLowRisk",
     "ageVerified",
     "accentId",
+    "accent",
   ];
 
   const patch: Partial<UserPrefs> = {};
   for (const key of allowed) {
     if (Object.prototype.hasOwnProperty.call(body, key)) {
       const value = body[key];
+      if (key === "accent" && !isAccentId(value)) continue;
       if (value !== undefined) {
         Object.assign(patch, { [key]: value });
       }

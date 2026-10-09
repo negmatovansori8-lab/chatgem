@@ -38,10 +38,10 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputPro
             {visible ? <EyeOff className="h-5 w-5" strokeWidth={2.25} /> : <Eye className="h-5 w-5" strokeWidth={2.25} />}
           </button>
         </div>
-        <label className="flex cursor-pointer items-center gap-2 select-none text-xs text-[var(--fg-muted)]">
+        <label className="flex min-h-9 w-fit cursor-pointer items-center gap-2 select-none text-xs text-[var(--fg-muted)]">
           <input
             type="checkbox"
-            className="h-3.5 w-3.5 rounded border-[var(--border)] accent-[var(--accent)]"
+            className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]"
             checked={visible}
             onChange={(e) => setVisible(e.target.checked)}
           />

@@ -1,13 +1,20 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, FolderKanban, Plus, Trash2 } from "lucide-react";
-import { AppBackButton } from "@/components/layout/app-back-button";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FolderKanban, Plus, Trash2 } from "lucide-react";
+import { WorkspaceHeader } from "@/components/layout/workspace-header";
 import { useI18n } from "@/components/i18n/locale-provider";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/toast";
+import { HttpError, jsonInit, requestJson } from "@/lib/http";
 import type { ProjectRecord } from "@/types/knowledge";
 
 export function ProjectsWorkspace() {
   const { t } = useI18n();
+  const toast = useToast();
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -15,214 +22,206 @@ export function ProjectsWorkspace() {
   const [selected, setSelected] = useState<ProjectRecord | null>(null);
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  async function refresh() {
-    const res = await fetch("/api/projects");
-    const data = await res.json();
-    setProjects(data.projects ?? []);
-    setLoading(false);
-  }
+  const fail = useCallback(
+    (e: unknown) => toast.error(e instanceof HttpError && e.offline ? t("common.offline") : t("common.requestFailed")),
+    [t, toast],
+  );
+
+  const refresh = useCallback(
+    () =>
+      requestJson<{ projects?: ProjectRecord[] }>("/api/projects")
+        .then((data) => {
+          setProjects(data.projects ?? []);
+          setLoadError(false);
+        })
+        .catch(() => setLoadError(true))
+        .finally(() => setLoading(false)),
+    [],
+  );
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [refresh]);
 
   async function onCreate(event: FormEvent) {
     event.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || saving) return;
     setSaving(true);
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description, instructions }),
-    });
-    const data = await res.json();
-    setName("");
-    setDescription("");
-    setInstructions("");
-    setCreating(false);
-    await refresh();
-    if (data.project) setSelected(data.project);
-    setSaving(false);
+    try {
+      const data = await requestJson<{ project?: ProjectRecord }>(
+        "/api/projects",
+        jsonInit("POST", { name: name.trim(), description, instructions }),
+      );
+      setName("");
+      setDescription("");
+      setInstructions("");
+      setCreating(false);
+      await refresh();
+      if (data.project) setSelected(data.project);
+    } catch (e) {
+      fail(e);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function onSave() {
-    if (!selected) return;
+    if (!selected || saving) return;
     setSaving(true);
-    await fetch(`/api/projects/${selected.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: selected.name,
-        description: selected.description,
-        instructions: selected.instructions,
-      }),
-    });
-    await refresh();
-    setSaving(false);
+    try {
+      await requestJson(
+        `/api/projects/${selected.id}`,
+        jsonInit("PATCH", {
+          name: selected.name,
+          description: selected.description,
+          instructions: selected.instructions,
+        }),
+      );
+      await refresh();
+      toast.success(t("common.save"));
+    } catch (e) {
+      fail(e);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function onDelete(id: string) {
-    await fetch(`/api/projects/${id}`, { method: "DELETE" });
-    if (selected?.id === id) setSelected(null);
-    await refresh();
+    try {
+      await requestJson(`/api/projects/${id}`, jsonInit("DELETE"));
+      if (selected?.id === id) setSelected(null);
+      await refresh();
+    } catch (e) {
+      fail(e);
+    }
   }
 
-  return (
-    <div className="mx-auto flex h-full min-h-0 max-w-lg flex-col bg-black text-white">
-      <header className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        {selected || creating ? (
-          <button
-            type="button"
-            onClick={() => {
-              setSelected(null);
-              setCreating(false);
-            }}
-            className="grid h-10 w-10 place-items-center rounded-full bg-[#2a2a2a]"
-            aria-label={t("common.back")}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-        ) : (
-          <AppBackButton className="max-w-[7rem]" />
-        )}
-        <h1 className="flex-1 text-center text-[17px] font-semibold">
-          {creating
-            ? t("projects.create")
-            : selected
-              ? t("projects.edit")
-              : t("projects.title")}
-        </h1>
-        {!selected && !creating ? (
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="grid h-10 w-10 place-items-center rounded-full bg-[#2a2a2a]"
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-        ) : (
-          <div className="w-10" />
-        )}
-      </header>
+  const inDetail = Boolean(selected || creating);
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
+  return (
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-[var(--bg)] text-[var(--fg)] md:max-w-xl">
+      <WorkspaceHeader
+        title={creating ? t("projects.create") : selected ? t("projects.edit") : t("projects.title")}
+        onBack={
+          inDetail
+            ? () => {
+                setSelected(null);
+                setCreating(false);
+              }
+            : undefined
+        }
+        action={
+          !inDetail ? (
+            <Button variant="ghost" size="icon" aria-label={t("projects.create")} onClick={() => setCreating(true)}>
+              <Plus className="h-5 w-5" />
+            </Button>
+          ) : null
+        }
+      />
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-4">
         {creating ? (
-          <form onSubmit={onCreate} className="space-y-3 pt-2">
-            <p className="text-sm text-white/45">{t("projects.subtitle")}</p>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("projects.name")}
-              required
-              className="w-full rounded-2xl bg-[#1a1a1a] px-4 py-3 text-[15px] outline-none placeholder:text-white/35"
-            />
-            <input
+          <form onSubmit={onCreate} className="space-y-3">
+            <p className="text-sm text-[var(--fg-muted)]">{t("projects.subtitle")}</p>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("projects.name")} required />
+            <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("projects.description")}
-              className="w-full rounded-2xl bg-[#1a1a1a] px-4 py-3 text-[15px] outline-none placeholder:text-white/35"
             />
-            <textarea
+            <Textarea
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               placeholder={t("projects.instructions")}
               rows={5}
-              className="w-full resize-none rounded-2xl bg-[#1a1a1a] px-4 py-3 text-[15px] outline-none placeholder:text-white/35"
+              className="resize-none"
             />
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full rounded-2xl bg-[#3b82f6] py-3.5 text-[15px] font-semibold disabled:opacity-50"
-            >
+            <Button type="submit" size="lg" className="w-full" disabled={saving || !name.trim()}>
               {t("projects.create")}
-            </button>
+            </Button>
           </form>
         ) : selected ? (
-          <div className="space-y-3 pt-2">
-            <input
+          <div className="space-y-3">
+            <Input
               value={selected.name}
+              aria-label={t("projects.name")}
               onChange={(e) => setSelected({ ...selected, name: e.target.value })}
-              className="w-full rounded-2xl bg-[#1a1a1a] px-4 py-3 text-[15px] outline-none"
             />
-            <textarea
+            <Textarea
               value={selected.description ?? ""}
-              onChange={(e) =>
-                setSelected({ ...selected, description: e.target.value })
-              }
+              onChange={(e) => setSelected({ ...selected, description: e.target.value })}
               placeholder={t("projects.description")}
               rows={2}
-              className="w-full resize-none rounded-2xl bg-[#1a1a1a] px-4 py-3 text-[15px] outline-none placeholder:text-white/35"
+              className="min-h-[72px] resize-none"
             />
-            <textarea
+            <Textarea
               value={selected.instructions ?? ""}
-              onChange={(e) =>
-                setSelected({ ...selected, instructions: e.target.value })
-              }
+              onChange={(e) => setSelected({ ...selected, instructions: e.target.value })}
               placeholder={t("projects.instructions")}
               rows={8}
-              className="w-full resize-none rounded-2xl bg-[#1a1a1a] px-4 py-3 text-[15px] outline-none placeholder:text-white/35"
+              className="resize-none"
             />
-            <button
-              type="button"
-              onClick={() => void onSave()}
-              disabled={saving}
-              className="w-full rounded-2xl bg-[#3b82f6] py-3.5 text-[15px] font-semibold disabled:opacity-50"
-            >
+            <Button size="lg" className="w-full" onClick={() => void onSave()} disabled={saving}>
               {t("common.save")}
-            </button>
+            </Button>
           </div>
+        ) : loading ? (
+          <div className="space-y-2" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-16 animate-pulse rounded-[var(--radius-lg)] bg-[var(--surface-2)]" />
+            ))}
+          </div>
+        ) : loadError ? (
+          <EmptyState
+            title={t("common.requestFailed")}
+            actions={
+              <Button variant="secondary" onClick={() => void refresh()}>
+                {t("common.retry")}
+              </Button>
+            }
+          />
+        ) : !projects.length ? (
+          <EmptyState
+            icon={<FolderKanban className="h-6 w-6" />}
+            title={t("projects.empty")}
+            description={t("projects.subtitle")}
+            actions={<Button onClick={() => setCreating(true)}>{t("projects.create")}</Button>}
+          />
         ) : (
-          <div className="space-y-3 pt-2">
-            <p className="text-center text-sm text-white/45">{t("projects.subtitle")}</p>
-            {loading ? (
-              <p className="py-8 text-center text-sm text-white/35">{t("common.loading")}</p>
-            ) : null}
-            {!loading && !projects.length ? (
-              <div className="flex flex-col items-center gap-3 py-12">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#1a1a1a]">
-                  <FolderKanban className="h-7 w-7 text-white/50" />
-                </div>
-                <p className="text-sm text-white/45">{t("projects.empty")}</p>
-                <button
-                  type="button"
-                  onClick={() => setCreating(true)}
-                  className="rounded-full bg-[#3b82f6] px-5 py-2.5 text-sm font-semibold"
-                >
-                  {t("projects.create")}
-                </button>
-              </div>
-            ) : null}
+          <div className="space-y-2">
+            <p className="mb-3 text-center text-sm text-[var(--fg-muted)]">{t("projects.subtitle")}</p>
             {projects.map((project) => (
               <div
                 key={project.id}
-                className="flex items-center gap-2 rounded-2xl bg-[#1a1a1a] p-2"
+                className="flex items-center gap-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-1.5"
               >
                 <button
                   type="button"
                   onClick={() => setSelected(project)}
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2.5 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-md)] px-2 py-2 text-start transition hover:bg-[var(--surface-2)]"
                 >
-                  <div className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent-2)]">
                     <FolderKanban className="h-5 w-5" />
                   </div>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-medium">
-                      {project.name}
-                    </span>
-                    <span className="block truncate text-xs text-white/40">
+                    <span className="block truncate text-[15px] font-medium">{project.name}</span>
+                    <span className="block truncate text-xs text-[var(--fg-subtle)]">
                       {project.description || t("projects.emptyDesc")}
                     </span>
                   </span>
                 </button>
-                <button
-                  type="button"
-                  className="grid h-10 w-10 place-items-center text-white/35 hover:text-red-400"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t("common.delete")}
+                  className="hover:text-[var(--danger)]"
                   onClick={() => void onDelete(project.id)}
                 >
                   <Trash2 className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             ))}
           </div>

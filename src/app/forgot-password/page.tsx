@@ -21,7 +21,7 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-dvh items-center justify-center bg-[var(--bg)] px-4 py-12">
       <div className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <Logo />
+          <Logo showWordmark />
           <h1 className="text-2xl font-bold text-[var(--fg)]">Forgot password</h1>
           <p className="text-sm text-[var(--fg-muted)]">
             Enter your email to request a secure reset link.

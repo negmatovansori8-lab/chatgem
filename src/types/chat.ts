@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mapContextSchema } from "@/lib/maps/context";
 
 export const createChatSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -16,8 +17,8 @@ export const chatAttachmentSchema = z.object({
   name: z.string().min(1).max(255),
   mimeType: z.string().min(1).max(120),
   size: z.number().int().positive().max(25 * 1024 * 1024),
-  /** Base64 data URL for images — used for vision, not persisted long-term. */
-  dataUrl: z.string().min(20).max(7_000_000).optional(),
+  /** Base64 data URL for images / video frames — vision only, not persisted. */
+  dataUrl: z.string().min(20).max(8_500_000).optional(),
 });
 
 export const chatMessageSchema = z
@@ -30,7 +31,24 @@ export const chatMessageSchema = z
     agentInstructions: z.string().min(1).max(8000).optional(),
     /** Force image generation for this turn (ChatGem image mode). */
     forceImage: z.boolean().optional(),
-    attachments: z.array(chatAttachmentSchema).max(5).optional(),
+    /** Re-answer last user turn without appending a duplicate USER message. */
+    regenerate: z.boolean().optional(),
+    /** Replace this USER message, drop following turns, then answer. */
+    editMessageId: z.string().min(1).max(80).optional(),
+    /** Prefer live web search for current events / facts. */
+    webSearch: z.boolean().optional(),
+    attachments: z.array(chatAttachmentSchema).max(8).optional(),
+    /** Last Maps result (destinations + real route metrics) for follow-ups. */
+    mapContext: mapContextSchema.optional(),
+    /** Client `Date#getTimezoneOffset()` for arrival clocks in map replies. */
+    tzOffsetMinutes: z.number().min(-900).max(900).optional(),
+    /** Voice Mode turn: the answer is spoken aloud in the language the user spoke. */
+    voice: z
+      .object({
+        language: z.string().min(2).max(16).optional(),
+        speaker: z.enum(["woman", "man"]).optional(),
+      })
+      .optional(),
   })
   .refine(
     (v) => Boolean(v.content?.trim()) || Boolean(v.attachments?.length),

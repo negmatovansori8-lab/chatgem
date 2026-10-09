@@ -4,12 +4,6 @@ import { resolveAppUrl, trimEnv } from "@/server/auth/app-url";
 
 type Params = { params: Promise<{ provider: string }> };
 
-/** Cursor / VS Code Simple Browser breaks Google OAuth with Error 400. */
-function isEmbeddedIdeBrowser(request: Request) {
-  const ua = request.headers.get("user-agent") || "";
-  return /Electron|Cursor\/|VSCodium|Code\/1\d|Visual Studio Code/i.test(ua);
-}
-
 export async function GET(request: Request, { params }: Params) {
   const { provider } = await params;
   const status = getOAuthProviderStatus().find((p) => p.id === provider);
@@ -31,16 +25,9 @@ export async function GET(request: Request, { params }: Params) {
     );
   }
 
-  if (provider === "google" && isEmbeddedIdeBrowser(request)) {
-    return NextResponse.redirect(
-      new URL(
-        `/login?oauth_error=${encodeURIComponent(
-          "Google дар браузери Cursor кор намекунад (хатои 400). Chrome ё Edge кушоед: http://localhost:3000/login",
-        )}`,
-        base,
-      ),
-    );
-  }
+  // Google OAuth in Electron Simple Browser often returns Error 400 —
+  // clients should open Chrome via /api/auth/open-browser. We still issue
+  // the Google redirect so that Chrome session can complete the flow.
 
   const redirectUri = `${base}/api/auth/callback/${provider}`;
   const state = crypto.randomUUID();

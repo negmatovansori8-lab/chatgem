@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { CreditCard, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppBackButton } from "@/components/layout/app-back-button";
+import { HttpError, requestJson } from "@/lib/http";
 
 type AdminPayload = {
   health: {
@@ -39,16 +40,16 @@ export function AdminWorkspace() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const res = await fetch("/api/admin");
-      const json = await res.json();
-      if (cancelled) return;
-      if (!res.ok) {
-        setError(json.error?.message ?? "Дастрасӣ рад шуд");
+      try {
+        const json = await requestJson<AdminPayload>("/api/admin");
+        if (cancelled) return;
+        setError(null);
+        setData(json);
+      } catch (e) {
+        if (cancelled) return;
+        setError(e instanceof HttpError && !e.offline ? e.message : "Интернет нест. Пайвастро санҷед.");
         setData(null);
-        return;
       }
-      setError(null);
-      setData(json);
     })();
     return () => {
       cancelled = true;
@@ -56,27 +57,26 @@ export function AdminWorkspace() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-5xl space-y-6 px-3 pb-6 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-6 sm:pb-8">
       <header className="flex items-start gap-2">
         <AppBackButton />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 pt-1">
           <p className="mb-2 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
             <Shield className="h-3.5 w-3.5" />
             Admin
           </p>
-          <h1 className="font-display text-3xl font-bold text-[var(--fg)]">Панели админ</h1>
-          <p className="mt-2 text-sm text-[var(--fg-muted)]">
-            {error ?? data?.note ?? "Боргирӣ…"}
-          </p>
+          <h1 className="font-display text-2xl font-bold text-[var(--fg)] sm:text-3xl">Панели админ</h1>
+          {!error ? (
+            <p className="mt-2 text-sm text-[var(--fg-muted)]">{data?.note ?? "Боргирӣ…"}</p>
+          ) : null}
         </div>
       </header>
 
       {error ? (
-        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-sm text-amber-50">
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-4 text-sm text-[var(--fg)]">
           <p>{error}</p>
-          <p className="mt-2 text-xs text-amber-100/80">
-            Бо почтаи админ ворид шавед, масалан{" "}
-            <strong>negmatovansori8@gmail.com</strong>
+          <p className="mt-2 text-xs text-[var(--fg-muted)]">
+            Ин саҳифа танҳо барои ҳисоби админ аст.
           </p>
           <Link href="/login" className="mt-3 inline-block">
             <Button className="rounded-full">Ворид шудан</Button>
@@ -120,9 +120,9 @@ export function AdminWorkspace() {
             <p>Stripe: {data.health.stripeReady ? "yes — пардохт воқеӣ" : "no — калид нест"}</p>
             <p className="mt-2 text-xs text-[var(--fg-subtle)]">{data.health.timestamp}</p>
             {!data.health.stripeReady ? (
-              <p className="mt-3 rounded-xl bg-amber-500/15 px-3 py-2 text-amber-100">
+              <p className="mt-3 rounded-xl bg-amber-500/10 px-3 py-2 text-[var(--fg)]">
                 Шумо админ ҳастед, аммо пул ба ҳисоб намеояд то Stripe қайд ва{" "}
-                <code className="text-white">STRIPE_SECRET_KEY</code> дар .env гузошта шавад.
+                <code className="font-mono text-[var(--fg)]">STRIPE_SECRET_KEY</code> дар .env гузошта шавад.
               </p>
             ) : null}
             <Link href="/app/billing" className="mt-4 inline-flex">

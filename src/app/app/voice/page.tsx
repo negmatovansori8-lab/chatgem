@@ -1,5 +1,6 @@
-import { VoiceWorkspace } from "@/features/media/voice-workspace";
+import { redirect } from "next/navigation";
 
+/** Voice Mode lives inside the chat so conversations are saved in history. */
 export default function Page() {
-  return <VoiceWorkspace />;
+  redirect("/app/chat?voice=1");
 }

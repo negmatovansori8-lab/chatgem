@@ -1,55 +1,42 @@
-import Image from "next/image";
 import Link from "next/link";
 import { brand } from "@/config/site";
+import { BrandMark, BrandWordmark } from "@/components/brand/brand-mark";
 import { cn } from "@/lib/utils";
+
+/** Mark-to-wordmark gap and type size scale with the mark so the lockup keeps its proportions. */
+const LOCKUP = {
+  sm: { mark: "sm", gap: "gap-2", text: "text-[17px]" },
+  md: { mark: "md", gap: "gap-2.5", text: "text-[19px]" },
+  lg: { mark: "lg", gap: "gap-3.5", text: "text-[28px]" },
+} as const;
 
 export function Logo({
   className,
   href = "/",
-  /** Extra text beside logo — off by default (PNG already says ChatGem). */
   showWordmark = false,
   size = "md",
+  animate = "none",
 }: {
   className?: string;
   href?: string;
   showWordmark?: boolean;
   size?: "sm" | "md" | "lg";
+  animate?: "none" | "intro";
 }) {
-  const box =
-    size === "lg" ? "h-12 w-12" : size === "sm" ? "h-8 w-8" : "h-9 w-9";
+  const lockup = LOCKUP[size];
 
   return (
     <Link
       href={href}
       className={cn(
-        "group inline-flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded-lg",
+        "brand-hover group inline-flex items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--landing-bg,var(--bg))]",
+        lockup.gap,
         className,
       )}
       aria-label={`${brand.name} home`}
     >
-      <span
-        className={cn(
-          "relative shrink-0 overflow-hidden rounded-xl bg-black shadow-[0_8px_24px_-10px_var(--accent-glow)]",
-          box,
-        )}
-      >
-        <Image
-          src="/chatgem-logo.png"
-          alt={brand.name}
-          width={96}
-          height={96}
-          className="h-full w-full object-cover object-top"
-          priority
-        />
-      </span>
-      {showWordmark ? (
-        <span className="font-[family-name:var(--font-display)] text-[15px] font-bold tracking-tight text-[var(--fg)]">
-          <span className="text-[var(--fg)]">Chat</span>
-          <span className="bg-gradient-to-r from-[#0f766e] via-[#0e7490] to-[#0369a1] bg-clip-text text-transparent">
-            Gem
-          </span>
-        </span>
-      ) : null}
+      <BrandMark size={lockup.mark} animate={animate} />
+      {showWordmark ? <BrandWordmark className={lockup.text} /> : null}
     </Link>
   );
 }

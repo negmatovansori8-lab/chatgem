@@ -1,5 +1,5 @@
 import { providerRegistry } from "@/providers/ai/types";
-import { groqProvider, openAIProvider } from "@/providers/ai/openai";
+import { googleProvider, groqProvider, openAIProvider } from "@/providers/ai/openai";
 import type { AIProvider } from "@/providers/ai/types";
 
 const placeholderProviders: AIProvider[] = [
@@ -13,20 +13,6 @@ const placeholderProviders: AIProvider[] = [
         providerId: "anthropic",
         name: "Claude Sonnet",
         kind: "reasoning",
-        capabilities: ["generate", "stream"],
-      },
-    ],
-  },
-  {
-    id: "google",
-    name: "Google AI",
-    configured: Boolean(process.env.GOOGLE_AI_API_KEY),
-    models: [
-      {
-        id: "google/gemini-flash",
-        providerId: "google",
-        name: "Gemini Flash",
-        kind: "chat",
         capabilities: ["generate", "stream"],
       },
     ],
@@ -48,6 +34,7 @@ export function bootstrapProviders() {
   // Prefer free Groq first in registry list order for default picks.
   providerRegistry.register(groqProvider);
   providerRegistry.register(openAIProvider);
+  providerRegistry.register(googleProvider);
   for (const provider of placeholderProviders) {
     providerRegistry.register(provider);
   }
@@ -57,18 +44,23 @@ export function bootstrapProviders() {
 
 export function listSelectableModels() {
   bootstrapProviders();
-  return providerRegistry.list().flatMap((provider) => {
-    const hasKey = providerHasKey(provider.id);
-    const executable = Boolean(provider.stream || provider.generate);
-    const configured = hasKey && executable;
-    provider.configured = configured;
+  return providerRegistry
+    .list()
+    .flatMap((provider) => {
+      const hasKey = providerHasKey(provider.id);
+      const executable = Boolean(provider.stream || provider.generate);
+      const configured = hasKey && executable;
+      provider.configured = configured;
 
-    return provider.models.map((model) => ({
-      ...model,
-      providerName: provider.name,
-      configured,
-    }));
-  });
+      // Hide stub providers that cannot actually stream/generate
+      if (!executable) return [];
+
+      return provider.models.map((model) => ({
+        ...model,
+        providerName: provider.name,
+        configured,
+      }));
+    });
 }
 
 export function resolveProviderForModel(modelId: string) {

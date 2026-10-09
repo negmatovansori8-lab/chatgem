@@ -7,7 +7,7 @@ describe("world languages", () => {
   });
 
   it("falls back to English for untranslated locales", () => {
-    expect(t("nav.start", "zu")).toBe("Start Free");
+    expect(t("nav.start", "zu")).toBe("Sign In");
     expect(getDictionary("zu")["nav.signin"]).toBe("Sign In");
   });
 

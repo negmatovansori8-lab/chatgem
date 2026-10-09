@@ -19,7 +19,7 @@ export default function ResetPasswordPage() {
     <div className="flex min-h-dvh items-center justify-center bg-[var(--bg)] px-4 py-12">
       <div className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <Logo />
+          <Logo showWordmark />
           <h1 className="text-2xl font-bold text-[var(--fg)]">Reset password</h1>
         </div>
         <form className="space-y-4" onSubmit={onSubmit}>

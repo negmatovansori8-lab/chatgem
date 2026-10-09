@@ -2,9 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Outfit, Syne, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { LocaleProvider } from "@/components/i18n/locale-provider";
+import { DeviceSync } from "@/components/system/device-sync";
+import { NetworkStatus } from "@/components/system/network-status";
 import { ToastProvider } from "@/components/ui/toast";
 import { WelcomeGate } from "@/components/welcome-gate";
 import { brand } from "@/config/site";
+import { BOOT_SCRIPT } from "@/lib/boot-script";
 import "./globals.css";
 
 const body = Outfit({
@@ -41,13 +44,6 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  icons: {
-    icon: [
-      { url: "/chatgem-logo.png", type: "image/png" },
-      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
-    ],
-    apple: [{ url: "/chatgem-logo.png", type: "image/png" }],
-  },
 };
 
 export const viewport: Viewport = {
@@ -56,7 +52,10 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#000000",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f4f2" },
+  ],
 };
 
 export default function RootLayout({
@@ -71,13 +70,18 @@ export default function RootLayout({
       className="h-full"
       data-scroll-behavior="smooth"
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
+      </head>
       <body
         className={`${body.variable} ${display.variable} ${mono.variable} min-h-full antialiased`}
       >
+        <DeviceSync />
         <ThemeProvider>
           <LocaleProvider>
             <ToastProvider>
               <WelcomeGate>{children}</WelcomeGate>
+              <NetworkStatus />
             </ToastProvider>
           </LocaleProvider>
         </ThemeProvider>

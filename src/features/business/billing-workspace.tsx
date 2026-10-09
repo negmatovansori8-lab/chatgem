@@ -1,215 +1,196 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Check, CreditCard, MessageSquare, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Check, CreditCard, MessageSquare, Sparkles } from "lucide-react";
+import { AppBackButton } from "@/components/layout/app-back-button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useI18n } from "@/components/i18n/locale-provider";
+import { HttpError, jsonInit, requestJson } from "@/lib/http";
+import { cn } from "@/lib/utils";
 import type { PlanDefinition, PlanId, SubscriptionRecord } from "@/types/business";
 
+type SubscriptionsResponse = {
+  plans?: PlanDefinition[];
+  subscription?: SubscriptionRecord | null;
+  paymentsConfigured?: boolean;
+};
+
+type ConfirmResponse = { subscription?: SubscriptionRecord | null; message?: string };
+
+const fetchSubscriptions = () => requestJson<SubscriptionsResponse>("/api/subscriptions");
+
+function redirectNotice(params: { get(name: string): string | null }, t: (key: string) => string) {
+  if (params.get("failed") === "1") return t("billing.notice.failed");
+  if (params.get("canceled") === "1") return t("billing.notice.canceled");
+  if (params.get("paid") === "1" && (params.get("provider") === "lemon" || !params.get("session_id"))) {
+    return t("billing.notice.pending");
+  }
+  return null;
+}
+
+function isStripeConfirm(params: { get(name: string): string | null }) {
+  return params.get("paid") === "1" && Boolean(params.get("session_id")) && params.get("provider") !== "lemon";
+}
+
 export function BillingWorkspace() {
-  const { t } = useI18n();
-  const router = useRouter();
+  const { t, locale } = useI18n();
+  const planFeatures = (plan: PlanDefinition): string[] => {
+    const key = `billing.features.${plan.id}`;
+    const text = t(key);
+    return text && text !== key ? text.split("\n") : plan.features;
+  };
   const searchParams = useSearchParams();
   const [plans, setPlans] = useState<PlanDefinition[]>([]);
   const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null);
   const [paymentsConfigured, setPaymentsConfigured] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(() => redirectNotice(searchParams, t));
+  const [busy, setBusy] = useState(() => isStripeConfirm(searchParams));
   const [payPlan, setPayPlan] = useState<"pro" | "business" | null>(null);
 
-  async function refresh() {
-    const res = await fetch("/api/subscriptions");
-    const data = await res.json();
+  const apply = useCallback((data: SubscriptionsResponse) => {
     setPlans(data.plans ?? []);
     setSubscription(data.subscription ?? null);
     setPaymentsConfigured(Boolean(data.paymentsConfigured));
-  }
+  }, []);
+
+  const errorText = useCallback(
+    (e: unknown, fallback = t("common.requestFailed")) =>
+      e instanceof HttpError ? (e.offline ? t("common.offline") : e.message || fallback) : fallback,
+    [t],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      const res = await fetch("/api/subscriptions");
-      const data = await res.json();
-      if (cancelled) return;
-      setPlans(data.plans ?? []);
-      setSubscription(data.subscription ?? null);
-      setPaymentsConfigured(Boolean(data.paymentsConfigured));
-    })();
+    fetchSubscriptions()
+      .then((data) => {
+        if (!cancelled) apply(data);
+      })
+      .catch((e) => {
+        if (!cancelled) setNotice(errorText(e));
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [apply, errorText]);
 
-  // After Stripe redirect — confirm paid session. Lemon activates via webhook.
+  // After a payment redirect: Stripe sessions are confirmed here, Lemon activates via webhook.
   useEffect(() => {
-    const paid = searchParams.get("paid");
-    const sessionId = searchParams.get("session_id");
-    const provider = searchParams.get("provider");
-    if (paid !== "1") return;
-
-    if (provider === "lemon" || !sessionId) {
-      setNotice(
-        "Пардохт қабул шуд. Агар Pro фавран фаъол нашавад — 10 сония интизор / саҳифаро навсозӣ кунед (webhook).",
-      );
-      void refresh();
-      window.history.replaceState({}, "", "/app/billing");
+    if (!isStripeConfirm(searchParams)) {
+      if (["paid", "canceled", "failed"].some((key) => searchParams.get(key) === "1")) {
+        window.history.replaceState({}, "", "/app/billing");
+      }
       return;
     }
 
     let cancelled = false;
-    void (async () => {
-      setBusy(true);
-      const res = await fetch("/api/billing/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
+    requestJson<ConfirmResponse>(
+      "/api/billing/confirm",
+      jsonInit("POST", { sessionId: searchParams.get("session_id") }),
+    )
+      .then(async (data) => {
+        if (cancelled) return;
+        setSubscription(data.subscription ?? null);
+        setNotice(data.message ?? t("billing.notice.activated"));
+        apply(await fetchSubscriptions());
+        window.history.replaceState({}, "", "/app/billing");
+      })
+      .catch((e) => {
+        if (!cancelled) setNotice(errorText(e, t("billing.notice.confirmFailed")));
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false);
       });
-      const data = await res.json();
-      if (cancelled) return;
-      setBusy(false);
-      if (!res.ok) {
-        setNotice(
-          data.error?.message ??
-            "Пардохт тасдиқ нашуд. Агар дар карта маблағ набошад — пул гирифта намешавад ва Pro фаъол намешавад.",
-        );
-        return;
-      }
-      setSubscription(data.subscription ?? null);
-      setNotice(data.message ?? "План активирован после реальной оплаты.");
-      await refresh();
-      window.history.replaceState({}, "", "/app/billing");
-    })();
 
     return () => {
       cancelled = true;
     };
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (searchParams.get("canceled") === "1") {
-      setNotice(
-        "Пардохт нагузашт. Агар дар карта маблағ набошад ё пардохт рад шавад — пул гирифта намешавад ва Pro фаъол намешавад. Лутфан картаи дигарро санҷед ё ба ҳисоб пул гузоред.",
-      );
-      window.history.replaceState({}, "", "/app/billing");
-    }
-    if (searchParams.get("failed") === "1") {
-      setNotice(
-        "Хатогии пардохт: карта рад шуд (маблағи нокифоя ё маҳдудият). Ҳеҷ маблағе аз ҳисоби шумо гирифта нашуд. Pro фаъол нест.",
-      );
-      window.history.replaceState({}, "", "/app/billing");
-    }
-  }, [searchParams]);
+  }, [searchParams, apply, errorText, t]);
 
   async function chooseFree() {
     setNotice(null);
-    const res = await fetch("/api/subscriptions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: "free" }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setNotice(data.error?.message ?? "Ошибка");
-      return;
+    try {
+      const data = await requestJson<SubscriptionsResponse>("/api/subscriptions", jsonInit("POST", { planId: "free" }));
+      setSubscription(data.subscription ?? null);
+      setNotice(t("billing.active"));
+    } catch (e) {
+      setNotice(errorText(e));
     }
-    setSubscription(data.subscription ?? null);
-    setNotice("Бесплатный план активен.");
   }
 
   async function startStripeCheckout(planId: "pro" | "business") {
     setBusy(true);
     setNotice(null);
-    const res = await fetch("/api/billing/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) {
-      setNotice(data.error?.message ?? "Не удалось начать оплату.");
+    let data: { url?: string };
+    try {
+      data = await requestJson<{ url?: string }>("/api/billing/checkout", jsonInit("POST", { planId }));
+    } catch (e) {
+      setNotice(errorText(e));
       return;
+    } finally {
+      setBusy(false);
     }
     if (data.url) {
-      window.location.href = data.url as string;
+      window.location.href = data.url;
       return;
     }
-    setNotice("Stripe не вернул ссылку оплаты.");
+    setNotice(t("billing.notice.noUrl"));
   }
 
   const current = (subscription?.planId ?? "free") as PlanId;
   const periodEnd = subscription?.periodEnd
-    ? new Date(subscription.periodEnd).toLocaleDateString("ru-RU")
+    ? new Date(subscription.periodEnd).toLocaleDateString(locale)
     : null;
   const price = payPlan === "business" ? 19 : 9;
 
   return (
-    <div className="mx-auto min-h-full max-w-5xl space-y-6 px-4 py-6 pb-24 sm:px-6">
-      <header className="flex items-start gap-2">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-full text-[var(--fg)] transition hover:bg-[var(--surface-2)]"
-          aria-label={t("common.back")}
+    <div className="mx-auto min-h-full w-full max-w-5xl space-y-5 px-3 pb-[max(6rem,calc(env(safe-area-inset-bottom)+4rem))] pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-6">
+      <header className="flex items-center gap-2">
+        <AppBackButton />
+        <h1 className="min-w-0 flex-1 truncate text-center text-[17px] font-semibold text-[var(--fg)]">
+          {t("billing.title")}
+        </h1>
+        <Link
+          href="/app/chat"
+          className={cn(buttonVariants({ size: "sm" }), "rounded-full")}
         >
-          <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="mb-1 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
-            <CreditCard className="h-3.5 w-3.5" />
-            Pro
-          </p>
-          <h1 className="font-display text-3xl font-bold text-[var(--fg)]">
-            {t("billing.title")}
-          </h1>
-          <p className="mt-2 text-sm text-[var(--fg-muted)]">
-            {t("billing.current")}: <strong className="text-[var(--fg)]">{current}</strong>
-            {periodEnd && current !== "free" ? (
-              <>
-                {" · "}
-                {t("billing.proActive")} {periodEnd}
-              </>
-            ) : null}
-          </p>
-          <p className="mt-1 text-sm text-[var(--fg-muted)]">{t("billing.subtitle")}</p>
-          {!paymentsConfigured ? (
-            <p className="mt-2 rounded-xl bg-amber-500/15 px-3 py-2 text-sm text-amber-200">
-              Пардохти Pro хомӯш аст. Барои Тоҷикистон:{" "}
-              <a
-                className="underline"
-                href="https://app.lemonsqueezy.com"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Lemon Squeezy
-              </a>{" "}
-              кушоед → маҳсулот Pro/Business → дар Render илова кунед:{" "}
-              <strong className="text-white">LEMON_SQUEEZY_API_KEY</strong>,{" "}
-              <strong className="text-white">LEMON_SQUEEZY_STORE_ID</strong>,{" "}
-              <strong className="text-white">LEMON_SQUEEZY_VARIANT_PRO</strong>,{" "}
-              <strong className="text-white">LEMON_SQUEEZY_VARIANT_BUSINESS</strong>,{" "}
-              <strong className="text-white">LEMON_SQUEEZY_WEBHOOK_SECRET</strong>.
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-emerald-400/90">
-              Пардохт пайваст аст (Lemon Squeezy / Stripe) — пул ба ҳисоби провайдер, баъд ба шумо.
-            </p>
-          )}
-        </div>
-        <Link href="/app/chat">
-          <Button className="rounded-full">
-            <MessageSquare className="h-4 w-4" />
-            {t("chat.chatBtn")}
-          </Button>
+          <MessageSquare className="h-4 w-4" />
+          <span className="max-[359px]:sr-only">{t("chat.chatBtn")}</span>
         </Link>
       </header>
+
+      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
+        <p className="mb-1 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+          <CreditCard className="h-3.5 w-3.5" />
+          Pro
+        </p>
+        <p className="text-sm text-[var(--fg-muted)]">
+          {t("billing.current")}: <strong className="text-[var(--fg)]">{current}</strong>
+          {periodEnd && current !== "free" ? (
+            <>
+              {" · "}
+              {t("billing.proActive")} {periodEnd}
+            </>
+          ) : null}
+        </p>
+        <p className="mt-1 text-sm text-[var(--fg-muted)]">{t("billing.subtitle")}</p>
+        <p
+          className={cn(
+            "mt-3 rounded-[var(--radius-md)] px-3 py-2 text-[13px] leading-relaxed",
+            paymentsConfigured
+              ? "bg-[var(--accent-muted)] text-[var(--accent-2)]"
+              : "bg-[var(--surface-2)] text-[var(--fg-muted)]",
+          )}
+        >
+          {paymentsConfigured ? t("billing.paymentsOn") : t("billing.paymentsOff")}
+        </p>
+      </section>
 
       {notice ? (
         <div
           role="alert"
-          className="rounded-[1.25rem] border border-amber-500/40 bg-amber-500/15 px-4 py-3 text-sm text-amber-50"
+          className="rounded-[var(--radius-lg)] border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-[var(--fg)]"
         >
           {notice}
         </div>
@@ -233,7 +214,7 @@ export function BillingWorkspace() {
                 </span>
               </p>
               <ul className="mt-4 flex-1 space-y-2 text-sm text-[var(--fg-muted)]">
-                {plan.features.map((feature) => (
+                {planFeatures(plan).map((feature) => (
                   <li key={feature} className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--accent)]" />
                     {feature}
@@ -267,7 +248,7 @@ export function BillingWorkspace() {
 
       {payPlan ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="visa-checkout-title"
@@ -277,42 +258,32 @@ export function BillingWorkspace() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[420px] space-y-4 rounded-[1.75rem] bg-[#1a1a1a] p-5 shadow-2xl sm:p-6"
+            className="w-full max-w-[420px] space-y-4 rounded-t-[1.75rem] border border-[var(--border)] bg-[var(--surface)] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-[var(--fg)] shadow-[var(--shadow-lg)] sm:rounded-[1.75rem] sm:p-6"
           >
             <div className="flex items-center gap-2.5">
-              <div className="rounded-md bg-[#2563eb] px-2.5 py-1 text-[11px] font-bold tracking-[0.12em] text-white">
+              <div className="rounded-md bg-[#1a1f71] px-2.5 py-1 text-[11px] font-bold tracking-[0.12em] text-white">
                 VISA
               </div>
-              <h3
-                id="visa-checkout-title"
-                className="text-[17px] font-semibold leading-snug text-white"
-              >
-                {payPlan === "pro"
-                  ? t("billing.visaTitle")
-                  : "Оплата Visa — Business на 1 месяц"}
+              <h3 id="visa-checkout-title" className="text-[17px] font-semibold leading-snug">
+                {payPlan === "pro" ? t("billing.visaTitle") : t("billing.businessTitle")}
               </h3>
             </div>
 
-            <p className="text-[13px] leading-relaxed text-[#a3a3a3]">
-              ${price} · 1 месяц. Оплата идёт через{" "}
-              <strong className="text-white">Stripe</strong> (Visa / Mastercard). Номер карты в
-              ChatGem не сохраняется — деньги списывает Stripe и зачисляет на ваш Stripe-счёт /
-              банк.
+            <p className="text-[13px] leading-relaxed text-[var(--fg-muted)]">
+              {t("billing.checkoutNote").replace("{price}", String(price))}
             </p>
 
             {!paymentsConfigured ? (
-              <p className="rounded-2xl bg-amber-500/10 px-4 py-3 text-[13px] text-amber-100">
-                Ҳоло кор намекунад, чунки Stripe калид нест. Дар{" "}
-                <code className="text-white">.env</code> гузоред:{" "}
-                <code className="text-white">STRIPE_SECRET_KEY=sk_live_...</code> ва серверро аз нав
-                оғоз кунед. Сипас пул аз харидор ба ҳисоби Stripe-и шумо меояд.
+              <p className="rounded-[var(--radius-md)] bg-[var(--surface-2)] px-4 py-3 text-[13px] text-[var(--fg-muted)]">
+                {t("billing.checkoutOff")}
               </p>
             ) : null}
 
             <div className="flex gap-2.5 pt-1">
               <Button
                 type="button"
-                className="h-12 flex-1 rounded-full bg-[#3b82f6] text-[15px] shadow-none hover:bg-[#2563eb]"
+                size="lg"
+                className="h-12 flex-1 rounded-full text-[15px]"
                 disabled={busy || !paymentsConfigured}
                 onClick={() => void startStripeCheckout(payPlan)}
               >
@@ -320,12 +291,13 @@ export function BillingWorkspace() {
                   ? "…"
                   : paymentsConfigured
                     ? t("billing.payAmount").replace("{price}", String(price))
-                    : t("billing.stripeFirst")}
+                    : t("billing.unavailable")}
               </Button>
               <Button
                 type="button"
                 variant="secondary"
-                className="h-12 rounded-full border-0 bg-[#2f2f2f] px-5 text-white hover:bg-[#3a3a3a]"
+                size="lg"
+                className="h-12 rounded-full px-5"
                 disabled={busy}
                 onClick={() => setPayPlan(null)}
               >

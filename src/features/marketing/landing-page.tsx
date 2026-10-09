@@ -6,19 +6,18 @@ import { FinalCtaSection } from "@/components/landing/final-cta";
 import { MarketingNavbar } from "@/components/layout/marketing-navbar";
 import { Footer } from "@/components/layout/footer";
 
-/** Marketing surface: cool mist + ink — not generic AI purple/black. */
+/** World-class marketing surface — deep ink + electric teal, globe brand. */
 export function LandingPage() {
   const landingVars = {
-    "--landing-bg": "#eef1f4",
-    "--landing-fg": "#0b1220",
-    "--landing-muted": "#5b6577",
-    "--landing-line": "rgba(11,18,32,0.08)",
-    "--landing-accent": "#0f766e",
-    "--landing-accent-fg": "#f4fffd",
-    "--landing-ink": "#070b12",
-    "--landing-panel": "#ffffff",
-    background:
-      "radial-gradient(120% 80% at 50% -10%, #d9e4ea 0%, #eef1f4 55%)",
+    "--landing-bg": "#05070c",
+    "--landing-fg": "#f4f7fb",
+    "--landing-muted": "#8b95a8",
+    "--landing-line": "rgba(255,255,255,0.08)",
+    "--landing-accent": "#2dd4bf",
+    "--landing-accent-fg": "#042f2e",
+    "--landing-ink": "#02040a",
+    "--landing-panel": "#0c121c",
+    background: "#05070c",
   } as CSSProperties;
 
   return (

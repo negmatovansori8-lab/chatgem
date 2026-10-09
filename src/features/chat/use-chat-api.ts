@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ChatRecord, MessageRecord } from "@/types/chat";
+import type { MapContext } from "@/lib/maps/context";
+import { requestJson } from "@/lib/http";
 
 export type ChatModelOption = {
   id: string;
@@ -13,60 +15,60 @@ export type ChatModelOption = {
 
 const fetchOpts: RequestInit = { credentials: "include" };
 
+function fetchChats(query: string) {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  return requestJson<{ chats?: ChatRecord[] }>(`/api/chats?${params.toString()}`, fetchOpts);
+}
+
 export function useChatList(query = "") {
   const [chats, setChats] = useState<ChatRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Offline / server errors keep the last list instead of throwing.
+  const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    const res = await fetch(`/api/chats?${params.toString()}`, fetchOpts);
-    const data = await res.json();
-    setChats(data.chats ?? []);
-    setLoading(false);
-  }, [query]);
+  const refresh = useCallback(
+    () =>
+      fetchChats(query)
+        .then((data) => setChats(data.chats ?? []))
+        .catch(() => {})
+        .finally(() => setLoadedQuery(query)),
+    [query],
+  );
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-
-    void (async () => {
-      const params = new URLSearchParams();
-      if (query) params.set("q", query);
-      const res = await fetch(`/api/chats?${params.toString()}`, fetchOpts);
-      const data = await res.json();
-      if (cancelled) return;
-      setChats(data.chats ?? []);
-      setLoading(false);
-    })();
-
+    fetchChats(query)
+      .then((data) => {
+        if (!cancelled) setChats(data.chats ?? []);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadedQuery(query);
+      });
     return () => {
       cancelled = true;
     };
   }, [query]);
 
-  return { chats, loading, refresh, setChats };
+  return { chats, loading: loadedQuery !== query, refresh, setChats };
 }
 
 export function useModels() {
   const [models, setModels] = useState<ChatModelOption[]>([]);
-  const [configuredCount, setConfiguredCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/models", fetchOpts)
-      .then((r) => r.json())
+    requestJson<{ models?: ChatModelOption[] }>("/api/models", fetchOpts)
       .then((data) => {
-        if (cancelled) return;
-        setModels(data.models ?? []);
-        setConfiguredCount(data.configuredCount ?? 0);
-      });
+        if (!cancelled) setModels(data.models ?? []);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, []);
 
-  return { models, configuredCount };
+  return { models };
 }
 
 async function readSseStream(
@@ -138,12 +140,19 @@ export async function streamChatMessage(input: {
   pluginId?: string;
   agentInstructions?: string;
   forceImage?: boolean;
+  regenerate?: boolean;
+  editMessageId?: string;
+  webSearch?: boolean;
   attachments?: Array<{
     name: string;
     mimeType: string;
     size: number;
     dataUrl?: string;
   }>;
+  mapContext?: MapContext | null;
+  tzOffsetMinutes?: number;
+  /** Voice Mode turn — the server answers briefly, in the spoken language, for TTS. */
+  voice?: { language?: string; speaker?: "woman" | "man" };
   signal?: AbortSignal;
   onEvent: (event: Record<string, unknown>) => void;
 }) {
@@ -162,6 +171,12 @@ export async function streamChatMessage(input: {
           ? { agentInstructions: input.agentInstructions }
           : {}),
         ...(input.forceImage ? { forceImage: true } : {}),
+        ...(input.regenerate ? { regenerate: true } : {}),
+        ...(input.editMessageId ? { editMessageId: input.editMessageId } : {}),
+        ...(input.webSearch ? { webSearch: true } : {}),
+        ...(input.mapContext ? { mapContext: input.mapContext } : {}),
+        ...(input.tzOffsetMinutes != null ? { tzOffsetMinutes: input.tzOffsetMinutes } : {}),
+        ...(input.voice ? { voice: input.voice } : {}),
         attachments: input.attachments,
       }),
       signal: input.signal,
@@ -187,7 +202,21 @@ export async function streamChatMessage(input: {
     return;
   }
 
-  let result = await readSseStream(res, input.onEvent);
+  let result: Awaited<ReturnType<typeof readSseStream>>;
+  try {
+    result = await readSseStream(res, input.onEvent);
+  } catch (error) {
+    input.onEvent(
+      input.signal?.aborted
+        ? { type: "error", code: "ABORTED", message: "Stopped." }
+        : {
+            type: "error",
+            code: "NETWORK",
+            message: error instanceof Error ? error.message : "Connection lost.",
+          },
+    );
+    return;
+  }
 
   // Legacy servers may still 404 — retry once as a brand-new chat.
   if (result.notFound && input.chatId && !input.signal?.aborted) {

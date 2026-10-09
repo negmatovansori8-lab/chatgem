@@ -112,4 +112,61 @@ export const chatRepository = {
     await save(store);
     return record;
   },
+
+  /** Replace the text of one assistant message written by `modelId` (map results). */
+  async updateAssistantMessage(
+    userId: string,
+    chatId: string,
+    messageId: string,
+    modelId: string,
+    content: string,
+  ) {
+    const store = await load();
+    const chat = store.chats.find((c) => c.id === chatId && c.userId === userId);
+    if (!chat) return null;
+    const message = store.messages.find(
+      (m) => m.id === messageId && m.chatId === chatId && m.role === "ASSISTANT" && m.modelId === modelId,
+    );
+    if (!message) return null;
+    message.content = content;
+    await save(store);
+    return message;
+  },
+
+  /** Delete a message and every message after it in the same chat (edit flow). */
+  async truncateFromMessage(userId: string, chatId: string, messageId: string) {
+    const store = await load();
+    const chat = store.chats.find((c) => c.id === chatId && c.userId === userId);
+    if (!chat) return false;
+    const ordered = store.messages
+      .filter((m) => m.chatId === chatId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const idx = ordered.findIndex((m) => m.id === messageId);
+    if (idx < 0) return false;
+    const drop = new Set(ordered.slice(idx).map((m) => m.id));
+    store.messages = store.messages.filter((m) => !drop.has(m.id));
+    chat.updatedAt = now();
+    await save(store);
+    return true;
+  },
+
+  /** Remove the latest assistant message (regenerate flow). */
+  async removeLastAssistant(userId: string, chatId: string) {
+    const store = await load();
+    const chat = store.chats.find((c) => c.id === chatId && c.userId === userId);
+    if (!chat) return false;
+    const ordered = store.messages
+      .filter((m) => m.chatId === chatId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    for (let i = ordered.length - 1; i >= 0; i -= 1) {
+      if (ordered[i]?.role === "ASSISTANT") {
+        const id = ordered[i]!.id;
+        store.messages = store.messages.filter((m) => m.id !== id);
+        chat.updatedAt = now();
+        await save(store);
+        return true;
+      }
+    }
+    return false;
+  },
 };

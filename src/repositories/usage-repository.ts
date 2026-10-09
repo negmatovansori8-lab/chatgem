@@ -6,9 +6,9 @@ function periodKey(date = new Date()) {
 }
 
 export const usageRepository = {
-  async get(userId: string, metric: string) {
+  async get(userId: string, metric: string, period?: string) {
     const records = await readJsonFile<UsageRecord[]>("usage.json", []);
-    const key = periodKey();
+    const key = period ?? periodKey();
     return (
       records.find((r) => r.userId === userId && r.metric === metric && r.periodKey === key) ?? {
         userId,
@@ -19,9 +19,9 @@ export const usageRepository = {
     );
   },
 
-  async increment(userId: string, metric: string, amount = 1) {
+  async increment(userId: string, metric: string, amount = 1, period?: string) {
     const records = await readJsonFile<UsageRecord[]>("usage.json", []);
-    const key = periodKey();
+    const key = period ?? periodKey();
     const existing = records.find(
       (r) => r.userId === userId && r.metric === metric && r.periodKey === key,
     );

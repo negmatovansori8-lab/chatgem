@@ -10,6 +10,7 @@ Modern AI chat app (ChatGPT-style) built with **Next.js App Router**, TypeScript
 - Conversations with unique IDs, New Chat, sidebar history
 - Guest chat without an account (`nj_guest_id` cookie)
 - Auth (email + Google/GitHub OAuth when configured)
+- Voice Mode inside the chat: talk in Tajik, Russian, English (or many other languages) and hear the answer in the same language — see [docs/VOICE.md](docs/VOICE.md)
 - API keys stay **server-side only** (never in the browser)
 
 ## Storage (important)
@@ -41,6 +42,8 @@ NEXTAUTH_URL=http://localhost:3000
 ```
 
 Optional: OAuth, Stripe, web search — see `.env.example`.
+
+Voice Mode uses the same keys: `OPENAI_API_KEY` (speech recognition + natural voice) or `GROQ_API_KEY` (speech recognition; replies are read with the device's voice). Details: [docs/VOICE.md](docs/VOICE.md).
 
 Never commit `.env`. Keys must not appear in frontend code.
 
@@ -99,6 +102,8 @@ npm run build
 ```
 src/app/api/chat/     SSE chat endpoint (keys server-side)
 src/features/chat/    Chat UI, markdown, hooks
+src/features/voice/   Voice Mode (mic, voice detection, playback, UI)
+src/services/voice/   Server STT / TTS providers (keys server-side)
 src/lib/local-store.ts  JSON persistence (.data/)
 prisma/schema.prisma  Future relational schema
 ```

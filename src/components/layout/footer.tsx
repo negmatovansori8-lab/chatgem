@@ -9,30 +9,24 @@ export function Footer() {
   const { t } = useI18n();
 
   return (
-    <footer className="border-t border-[var(--landing-line,rgba(11,18,32,0.08))] bg-[var(--landing-bg,#eef1f4)]">
-      <div className="mx-auto flex max-w-6xl flex-col items-start gap-5 px-4 py-12 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
+    <footer className="border-t border-white/8 bg-[#03050a]">
+      <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-14 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="max-w-sm">
           <Logo showWordmark />
-          <p className="mt-3 text-sm leading-relaxed text-[var(--landing-muted,#5b6577)]">
+          <p className="mt-3 text-sm leading-relaxed text-white/40">
             {t("landing.footer.tagline")}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[var(--landing-muted,#5b6577)]">
-          <Link
-            href="/login"
-            className="transition hover:text-[var(--landing-fg,#0b1220)]"
-          >
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/45">
+          <Link href="/login" className="transition hover:text-white">
             {t("nav.signin")}
           </Link>
-          <Link
-            href="/register"
-            className="transition hover:text-[var(--landing-fg,#0b1220)]"
-          >
-            {t("auth.register.cta")}
+          <Link href="/app/chat" className="transition hover:text-white">
+            {t("hero.ctaSecondary")}
           </Link>
         </div>
-        <p className="text-xs text-[var(--landing-muted,#5b6577)] sm:ms-auto">
-          © {new Date().getFullYear()} {brand.name}
+        <p className="text-xs text-white/30 sm:ms-auto">
+          © {new Date().getFullYear()} {brand.shortName}
         </p>
       </div>
     </footer>

@@ -1,18 +1,13 @@
-"use client";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { SettingsWorkspace } from "@/features/settings/settings-workspace";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+export const metadata: Metadata = { title: "Settings" };
 
-/** Settings lives on /app/profile (ChatGPT-style account panels). */
 export default function Page() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/app/profile");
-  }, [router]);
   return (
-    <div className="flex min-h-full items-center justify-center bg-[var(--bg)] text-sm text-[var(--fg-muted)]">
-      {/** Intentionally minimal redirect splash */}
-      <span className="animate-pulse">Settings…</span>
-    </div>
+    <Suspense>
+      <SettingsWorkspace />
+    </Suspense>
   );
 }

@@ -54,58 +54,63 @@ const modules = [
   },
 ] as const;
 
+/** Feature strip — one job per row, no card chrome. */
 export function PlatformSection() {
   const { t } = useI18n();
 
   return (
-    <section className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-      <div className="max-w-2xl">
-        <h2 className="font-[family-name:var(--font-display)] text-[clamp(1.6rem,3.5vw,2.35rem)] font-bold tracking-tight text-[var(--landing-ink,#070b12)]">
-          {t("landing.features.title")}
-        </h2>
-        <p className="mt-3 text-[15px] leading-relaxed text-[var(--landing-muted,#5b6577)]">
-          {t("landing.features.subtitle")}
-        </p>
-      </div>
+    <section className="relative border-t border-white/8 bg-[#05070c] py-20 sm:py-28">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="max-w-2xl">
+          <h2 className="font-[family-name:var(--font-display)] text-[clamp(1.75rem,4vw,2.6rem)] font-bold tracking-tight text-white">
+            {t("landing.features.title")}
+          </h2>
+          <p className="mt-3 text-[15px] leading-relaxed text-white/50 sm:text-base">
+            {t("landing.features.subtitle")}
+          </p>
+        </div>
 
-      <div className="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-        {modules.map((mod) => {
-          const Icon = mod.icon;
-          return (
-            <div key={mod.titleKey}>
-              <Link
-                href={mod.href}
-                onClick={() => {
-                  if ("draft" in mod && mod.draft) {
-                    try {
-                      sessionStorage.setItem(
-                        DRAFT_KEY,
-                        t("chat.fixWritingPrompt"),
-                      );
-                    } catch {
-                      // ignore
+        <ul className="mt-14 divide-y divide-white/8 border-y border-white/8">
+          {modules.map((mod) => {
+            const Icon = mod.icon;
+            return (
+              <li key={mod.titleKey}>
+                <Link
+                  href={mod.href}
+                  onClick={() => {
+                    if ("draft" in mod && mod.draft) {
+                      try {
+                        sessionStorage.setItem(
+                          DRAFT_KEY,
+                          t("chat.fixWritingPrompt"),
+                        );
+                      } catch {
+                        // ignore
+                      }
                     }
-                  }
-                }}
-                className="group block"
-              >
-                <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl bg-[var(--landing-ink,#070b12)]/5 text-[var(--landing-accent,#0f766e)] transition group-hover:bg-[var(--landing-accent,#0f766e)]/15">
-                  <Icon className="h-5 w-5" strokeWidth={1.75} />
-                </div>
-                <h3 className="text-lg font-semibold tracking-tight text-[var(--landing-ink,#070b12)]">
-                  {t(mod.titleKey)}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-[var(--landing-muted,#5b6577)]">
-                  {t(mod.bodyKey)}
-                </p>
-                <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[var(--landing-accent,#0f766e)]">
-                  {t("landing.platform.open")}
-                  <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                </span>
-              </Link>
-            </div>
-          );
-        })}
+                  }}
+                  className="group flex items-start gap-4 py-6 transition sm:items-center sm:gap-6 sm:py-7"
+                >
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-teal-400/10 text-teal-300 transition group-hover:bg-teal-400/20">
+                    <Icon className="h-5 w-5" strokeWidth={1.75} />
+                  </span>
+                  <span className="min-w-0 flex-1 text-start">
+                    <span className="block text-lg font-semibold tracking-tight text-white">
+                      {t(mod.titleKey)}
+                    </span>
+                    <span className="mt-1 block text-sm leading-relaxed text-white/45 sm:text-[15px]">
+                      {t(mod.bodyKey)}
+                    </span>
+                  </span>
+                  <span className="mt-1 inline-flex shrink-0 items-center gap-1 text-sm font-medium text-teal-300/80 transition group-hover:translate-x-0.5 group-hover:text-teal-200">
+                    {t("landing.platform.open")}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </section>
   );

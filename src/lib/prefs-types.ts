@@ -14,7 +14,9 @@ export type UserPrefs = {
   remoteOff: boolean;
   pluginLowRisk: boolean;
   ageVerified: boolean;
+  /** Legacy: always saved as "blue" by the old settings screen, so it can't tell a real choice apart. */
   accentId: string;
+  accent: string;
 };
 
 export const DEFAULT_PREFS: UserPrefs = {
@@ -34,6 +36,7 @@ export const DEFAULT_PREFS: UserPrefs = {
   pluginLowRisk: true,
   ageVerified: false,
   accentId: "blue",
+  accent: "teal",
 };
 
 export function prefsToSystemBlock(prefs: UserPrefs): string | null {

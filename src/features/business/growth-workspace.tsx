@@ -34,7 +34,7 @@ export function GrowthWorkspace() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
+    <div className="mx-auto w-full max-w-4xl space-y-6 px-3 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6 sm:pb-8">
       <div>
         <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--fg)]">
           Growth

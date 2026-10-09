@@ -43,7 +43,7 @@ export function AuthShell({
       {/* Brand panel — desktop */}
       <aside className="relative hidden w-[44%] flex-col justify-between border-e border-[var(--border)] p-10 lg:flex xl:w-[46%]">
         <div className="flex items-center justify-between gap-3">
-          <Logo href="/" />
+          <Logo href="/" showWordmark />
           <div className="flex items-center gap-1">
             <LanguageSwitcher compact />
             <ThemeToggle />
@@ -77,7 +77,7 @@ export function AuthShell({
       {/* Form panel */}
       <main className="relative flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-8">
         <div className="mb-6 flex w-full max-w-md items-center justify-between lg:hidden">
-          <Logo href="/" />
+          <Logo href="/" showWordmark />
           <div className="flex items-center gap-1">
             <LanguageSwitcher compact />
             <ThemeToggle />

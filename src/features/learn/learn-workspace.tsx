@@ -65,7 +65,7 @@ export function LearnWorkspace() {
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col bg-[var(--bg)] text-[var(--fg)]">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col bg-[var(--bg)] px-1 text-[var(--fg)] sm:px-0">
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <AppBackButton className="shrink-0" />
         <div className="min-w-0 flex-1">
@@ -85,7 +85,7 @@ export function LearnWorkspace() {
               type="button"
               onClick={() => setSubject(item)}
               className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                "min-h-9 rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
                 subject === item
                   ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
                   : "border-[var(--border)] text-[var(--fg-muted)] hover:bg-[var(--surface-2)]",
@@ -103,7 +103,7 @@ export function LearnWorkspace() {
               type="button"
               onClick={() => setLevel(item)}
               className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                "min-h-9 rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
                 level === item
                   ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
                   : "border-[var(--border)] text-[var(--fg-muted)] hover:bg-[var(--surface-2)]",

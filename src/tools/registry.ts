@@ -29,10 +29,10 @@ export class ToolRegistry {
 export const toolRegistry = new ToolRegistry();
 
 toolRegistry.register({
-  slug: "calculator",
-  name: "Calculator",
-  description: "Deterministic math utilities.",
-  category: "productivity",
+  slug: "maps",
+  name: "Maps & Navigation",
+  description: "Search places and routes worldwide.",
+  category: "navigation",
   configured: true,
 });
 

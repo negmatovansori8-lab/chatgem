@@ -66,7 +66,7 @@ export function TeamWorkspace() {
   }
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-6 px-4 py-8 lg:grid-cols-[1fr_1.2fr] sm:px-6">
+    <div className="mx-auto grid w-full max-w-5xl gap-6 px-3 pb-6 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6 sm:pb-8 lg:grid-cols-[1fr_1.2fr]">
       <section className="space-y-4">
         <div>
           <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-[var(--fg)]">

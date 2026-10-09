@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
@@ -11,26 +10,27 @@ import {
   useState,
 } from "react";
 import {
-  AudioLines,
   FolderOpen,
   ImageIcon,
-  Menu,
+  Map,
   MessageSquarePlus,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Pin,
   BookOpen,
   Puzzle,
-  Search,
   Settings,
   Trash2,
-  X,
 } from "lucide-react";
 import { useChatList } from "@/features/chat/use-chat-api";
 import { UserMenu } from "@/features/profile/profile-workspace";
-import { BrandMark } from "@/components/brand/brand-mark";
+import { BrandMark, BrandWordmark } from "@/components/brand/brand-mark";
+import { ProMonthNotice } from "@/components/layout/pro-month-notice";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useToast } from "@/components/ui/toast";
+import { HttpError, jsonInit, requestJson } from "@/lib/http";
 import { cn } from "@/lib/utils";
 
 type SidebarCtx = {
@@ -47,24 +47,18 @@ export function useAppSidebar() {
   return ctx;
 }
 
-function useDebounced(value: string, ms = 220) {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const id = window.setTimeout(() => setV(value), ms);
-    return () => window.clearTimeout(id);
-  }, [value, ms]);
-  return v;
-}
-
-function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
+function DrawerContent({
+  closeSidebar,
+}: {
+  closeSidebar: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useI18n();
   const toast = useToast();
-  const { setOpen } = useAppSidebar();
-  const [query, setQuery] = useState("");
-  const debouncedQuery = useDebounced(query);
-  const { chats, loading, refresh, setChats } = useChatList(debouncedQuery);
+  const { chats, loading, refresh, setChats } = useChatList("");
+  const onChatRoute =
+    pathname.startsWith("/app/chat") || pathname.startsWith("/app/chats");
 
   useEffect(() => {
     const onChatsChanged = () => {
@@ -74,33 +68,40 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
     return () => window.removeEventListener("nj:chats-changed", onChatsChanged);
   }, [refresh]);
 
-  async function deleteChat(id: string) {
-    const res = await fetch(`/api/chats/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      toast.error(t("chat.requestFailed"));
-      return;
+  function go(href: string, opts?: { keepSidebarOnDesktop?: boolean }) {
+    const mobile = window.matchMedia("(max-width: 1023px)").matches;
+    // Tool pages always close the drawer so the destination is visible.
+    if (!opts?.keepSidebarOnDesktop || mobile) {
+      closeSidebar();
     }
+    router.push(href);
+  }
+
+  async function patchChat(id: string, init: RequestInit) {
+    try {
+      await requestJson(`/api/chats/${id}`, init);
+      return true;
+    } catch (e) {
+      toast.error(e instanceof HttpError && e.offline ? t("common.offline") : t("chat.requestFailed"));
+      return false;
+    }
+  }
+
+  async function deleteChat(id: string) {
+    if (!(await patchChat(id, jsonInit("DELETE")))) return;
     setChats((prev) => prev.filter((c) => c.id !== id));
     window.dispatchEvent(new Event("nj:chats-changed"));
     toast.success(t("chat.deleted"));
     if (pathname === `/app/chat/${id}`) {
       router.push("/app/chat");
-      onNavigate?.();
+      if (window.matchMedia("(max-width: 1023px)").matches) closeSidebar();
     }
   }
 
   async function renameChat(id: string, current: string) {
     const next = window.prompt(t("chat.renamePrompt"), current)?.trim();
     if (!next || next === current) return;
-    const res = await fetch(`/api/chats/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: next }),
-    });
-    if (!res.ok) {
-      toast.error(t("chat.requestFailed"));
-      return;
-    }
+    if (!(await patchChat(id, jsonInit("PATCH", { title: next })))) return;
     setChats((prev) =>
       prev.map((c) => (c.id === id ? { ...c, title: next } : c)),
     );
@@ -109,15 +110,7 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   async function togglePin(id: string, pinned: boolean) {
-    const res = await fetch(`/api/chats/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pinned: !pinned }),
-    });
-    if (!res.ok) {
-      toast.error(t("chat.requestFailed"));
-      return;
-    }
+    if (!(await patchChat(id, jsonInit("PATCH", { pinned: !pinned })))) return;
     setChats((prev) =>
       prev.map((c) => (c.id === id ? { ...c, pinned: !pinned } : c)),
     );
@@ -135,102 +128,90 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col bg-[var(--surface)] text-[var(--fg)]">
-      {/* Brand + close */}
+      {/* Brand: logo + ChatGem; exit lives in main header (AppMenuButton) */}
       <div className="flex items-center gap-2 px-3 py-3">
         <button
           type="button"
-          onClick={() => setOpen(false)}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)] md:hidden"
-          aria-label="Close menu"
+          onClick={() => go("/app/chat", { keepSidebarOnDesktop: true })}
+          className="brand-hover flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] py-0.5 text-start transition hover:opacity-90"
         >
-          <X className="h-5 w-5" />
+          <BrandMark size="sm" />
+          <BrandWordmark className="text-[17px]" />
         </button>
-        <Link
-          href="/app/chat"
-          onClick={onNavigate}
-          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1"
-        >
-          <BrandMark size="sm" className="rounded-xl" />
-          <span className="truncate text-[15px] font-semibold tracking-tight">
-            ChatGem
-          </span>
-        </Link>
+        {/* Mobile: exit sidebar with same ChatGPT-style icon */}
         <button
           type="button"
-          onClick={() => setOpen(false)}
-          className="hidden h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)] md:grid"
-          aria-label="Collapse sidebar"
+          onClick={() => closeSidebar()}
+          className="nj-panel-btn grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--fg)] transition hover:bg-[var(--surface-2)] lg:hidden"
+          aria-label="Close menu"
+          title="Баромадан"
         >
-          <X className="h-4 w-4" />
+          <PanelLeftClose className="h-5 w-5" strokeWidth={1.5} />
         </button>
       </div>
 
       {/* New chat — primary */}
-      <div className="px-2 pb-2">
-        <Link
-          href="/app/chat"
-          onClick={onNavigate}
-          className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-[14px] font-medium text-[var(--fg)] transition hover:bg-[var(--surface-3)]"
+      <div className="px-2.5 pb-2">
+        <button
+          type="button"
+          onClick={() => go("/app/chat", { keepSidebarOnDesktop: true })}
+          className="flex w-full items-center gap-2.5 rounded-[var(--radius-md)] bg-[var(--fg)] px-3 py-2.5 text-[13.5px] font-semibold text-[var(--bg)] transition hover:opacity-90 active:scale-[0.99]"
         >
-          <MessageSquarePlus className="h-[18px] w-[18px] text-[var(--fg-muted)]" strokeWidth={1.75} />
+          <MessageSquarePlus className="h-[17px] w-[17px]" strokeWidth={2} />
           {t("sidebar.newChat")}
-        </Link>
-      </div>
-
-      {/* Search chats */}
-      <div className="px-2 pb-2">
-        <label className="flex items-center gap-2 rounded-xl bg-[var(--surface-2)] px-3 py-2">
-          <Search className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("chat.searchChats")}
-            className="min-w-0 flex-1 bg-transparent text-sm text-[var(--fg)] outline-none placeholder:text-[var(--fg-subtle)]"
-          />
-        </label>
+        </button>
       </div>
 
       {/* Compact tools */}
-      <nav className="space-y-0.5 px-2 pb-2">
+      <nav className="space-y-0.5 px-2.5 pb-2">
         {(
           [
             { href: "/app/gallery", labelKey: "sidebar.images", icon: ImageIcon },
             { href: "/app/files", labelKey: "sidebar.files", icon: FolderOpen },
             { href: "/app/knowledge", labelKey: "sidebar.library", icon: BookOpen },
-            { href: "/app/voice", labelKey: "sidebar.voice", icon: AudioLines },
             { href: "/app/tools", labelKey: "sidebar.plugins", icon: Puzzle },
+            { href: "/app/maps", labelKey: "sidebar.maps", icon: Map },
           ] as const
         ).map((item) => {
           const Icon = item.icon;
           const active = pathname.startsWith(item.href);
           return (
-            <Link
+            <button
               key={item.href}
-              href={item.href}
-              onClick={onNavigate}
+              type="button"
+              onClick={() => go(item.href)}
               className={cn(
-                "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[14px] font-medium transition",
+                "flex w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 py-2 text-start text-[13.5px] font-medium transition",
                 active
-                  ? "bg-[var(--surface-3)] text-[var(--fg)]"
+                  ? "bg-[var(--accent-muted)] text-[var(--accent-2)]"
                   : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
               )}
             >
-              <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+              <Icon className="h-[17px] w-[17px]" strokeWidth={1.75} />
               {t(item.labelKey)}
-            </Link>
+            </button>
           );
         })}
       </nav>
 
       <div className="mx-3 mb-1 h-px bg-[var(--border)]" />
 
-      <p className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--fg-subtle)]">
-        {t("sidebar.chats")}
-      </p>
-
-      {/* Real history */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {loading && !sorted.length ? (
+      {/* Chat history — only on chat routes (avoids “stuck on empty chats” confusion) */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1">
+        {!onChatRoute ? (
+          <div className="px-2 py-4 text-center">
+            <p className="text-[12px] leading-relaxed text-[var(--fg-subtle)]">
+              {t("sidebar.sectionOpen")}
+            </p>
+            <button
+              type="button"
+              onClick={() => go("/app/chat", { keepSidebarOnDesktop: true })}
+              className="mt-3 inline-flex rounded-full border border-[var(--border)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--fg-muted)] hover:bg-[var(--surface-2)]"
+            >
+              {t("sidebar.newChat")}
+            </button>
+          </div>
+        ) : loading && !sorted.length ? (
           <div className="space-y-2 px-1 py-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <div
@@ -239,18 +220,19 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
               />
             ))}
           </div>
-        ) : null}
-
+        ) : (
         <ul className="space-y-0.5">
           {sorted.slice(0, 50).map((chat) => {
             const active = pathname === `/app/chat/${chat.id}`;
             return (
               <li key={chat.id} className="group relative flex items-center">
-                <Link
-                  href={`/app/chat/${chat.id}`}
-                  onClick={onNavigate}
+                <button
+                  type="button"
+                  onClick={() =>
+                    go(`/app/chat/${chat.id}`, { keepSidebarOnDesktop: true })
+                  }
                   className={cn(
-                    "min-w-0 flex-1 truncate rounded-xl py-2 pe-20 ps-3 text-[13.5px] leading-snug transition",
+                    "min-w-0 flex-1 truncate rounded-xl py-2.5 pe-[5.5rem] ps-3 text-start text-[13.5px] leading-snug transition",
                     active
                       ? "bg-[var(--surface-3)] text-[var(--fg)]"
                       : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
@@ -260,13 +242,13 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
                     <Pin className="me-1.5 inline h-3 w-3 -translate-y-px text-[var(--accent)]" />
                   ) : null}
                   {chat.title || t("chat.newChat")}
-                </Link>
-                <div className="absolute end-1 flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                </button>
+                <div className="absolute end-0.5 flex items-center gap-0.5 rounded-lg bg-[var(--surface)]/95 opacity-100 backdrop-blur-sm sm:bg-transparent sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                   <button
                     type="button"
                     title={t("chat.pin")}
                     aria-label={t("chat.pin")}
-                    className="grid h-7 w-7 place-items-center rounded-md text-[var(--fg-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
+                    className="grid h-8 w-8 place-items-center rounded-md text-[var(--fg-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -284,7 +266,7 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
                     type="button"
                     title={t("chat.rename")}
                     aria-label={t("chat.rename")}
-                    className="grid h-7 w-7 place-items-center rounded-md text-[var(--fg-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
+                    className="grid h-8 w-8 place-items-center rounded-md text-[var(--fg-subtle)] hover:bg-[var(--surface-3)] hover:text-[var(--fg)]"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -297,7 +279,7 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
                     type="button"
                     title={t("chat.delete")}
                     aria-label={t("chat.delete")}
-                    className="grid h-7 w-7 place-items-center rounded-md text-[var(--fg-subtle)] hover:bg-red-500/15 hover:text-red-400"
+                    className="grid h-8 w-8 place-items-center rounded-md text-[var(--fg-subtle)] hover:bg-red-500/15 hover:text-red-400"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -316,24 +298,25 @@ function DrawerContent({ onNavigate }: { onNavigate?: () => void }) {
             </li>
           ) : null}
         </ul>
+        )}
       </div>
 
-      {/* Settings + profile — ChatGPT bottom bar */}
-      <div className="space-y-1 border-t border-[var(--border)] p-2">
-        <Link
-          href="/app/profile"
-          onClick={onNavigate}
+      {/* Settings + profile */}
+      <div className="space-y-1 border-t border-[var(--border)] p-2.5">
+        <button
+          type="button"
+          onClick={() => go("/app/settings")}
           className={cn(
-            "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[14px] font-medium transition",
+            "flex w-full items-center gap-2.5 rounded-[var(--radius-md)] px-3 py-2.5 text-start text-[13.5px] font-medium transition",
             pathname.startsWith("/app/profile") || pathname.startsWith("/app/settings")
-              ? "bg-[var(--surface-3)] text-[var(--fg)]"
+              ? "bg-[var(--accent-muted)] text-[var(--accent-2)]"
               : "text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
           )}
         >
-          <Settings className="h-[18px] w-[18px]" strokeWidth={1.75} />
+          <Settings className="h-[17px] w-[17px]" strokeWidth={1.75} />
           {t("sidebar.settings")}
-        </Link>
-        <div className="flex items-center gap-1 rounded-xl px-1 py-1">
+        </button>
+        <div className="flex items-center gap-1 rounded-[var(--radius-md)] px-0.5 py-0.5">
           <div className="min-w-0 flex-1">
             <UserMenu />
           </div>
@@ -351,28 +334,56 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const value = useMemo(() => ({ open, setOpen, toggle }), [open, toggle]);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("nj_sidebar_open");
-      if (saved === "0" || saved === "1") {
-        if (window.matchMedia("(min-width: 768px)").matches) {
+    const mq = window.matchMedia("(min-width: 1024px)");
+
+    function applyDesktopDefault() {
+      try {
+        const saved = localStorage.getItem("nj_sidebar_open");
+        if (saved === "0" || saved === "1") {
+          if (mq.matches) {
+            setOpen(saved === "1");
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+      if (mq.matches) {
+        const isGallery =
+          window.location.pathname.startsWith("/app/gallery") ||
+          window.location.pathname.startsWith("/app/images");
+        setOpen(!isGallery);
+      } else {
+        setOpen(false);
+      }
+    }
+
+    applyDesktopDefault();
+
+    function onChange() {
+      if (!mq.matches) {
+        setOpen(false);
+        return;
+      }
+      try {
+        const saved = localStorage.getItem("nj_sidebar_open");
+        if (saved === "0" || saved === "1") {
           setOpen(saved === "1");
           return;
         }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
+      setOpen(true);
     }
-    if (window.matchMedia("(min-width: 768px)").matches) {
-      const isGallery =
-        window.location.pathname.startsWith("/app/gallery") ||
-        window.location.pathname.startsWith("/app/images");
-      setOpen(!isGallery);
-    }
+
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   useEffect(() => {
     try {
-      if (window.matchMedia("(min-width: 768px)").matches) {
+      if (window.matchMedia("(min-width: 1024px)").matches) {
         localStorage.setItem("nj_sidebar_open", open ? "1" : "0");
       }
     } catch {
@@ -381,20 +392,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [open]);
 
   useEffect(() => {
-    const mobile = window.matchMedia("(max-width: 767px)").matches;
-    const isGallery =
-      pathname.startsWith("/app/gallery") || pathname.startsWith("/app/images");
-    if (mobile || isGallery) {
+    // Close drawer after navigation so destination pages are visible.
+    const overlay = window.matchMedia("(max-width: 1023px)").matches;
+    const isToolPage =
+      pathname.startsWith("/app/gallery") ||
+      pathname.startsWith("/app/images") ||
+      pathname.startsWith("/app/files") ||
+      pathname.startsWith("/app/knowledge") ||
+      pathname.startsWith("/app/tools") ||
+      pathname.startsWith("/app/maps") ||
+      pathname.startsWith("/app/profile") ||
+      pathname.startsWith("/app/settings") ||
+      pathname.startsWith("/app/voice") ||
+      pathname.startsWith("/app/billing");
+    if (overlay || isToolPage) {
       setOpen(false);
     }
   }, [pathname]);
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    if (!mq.matches || !open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   return (
     <SidebarContext.Provider value={value}>
-      <div className="relative flex h-dvh max-h-dvh min-h-0 overflow-hidden bg-[var(--bg)] text-[var(--fg)] supports-[height:100dvh]:h-dvh">
+      <div className="nj-app-shell relative flex h-dvh max-h-dvh min-h-0 w-full overflow-hidden bg-[var(--bg)] text-[var(--fg)] supports-[height:100dvh]:h-dvh">
         <div
           className={cn(
-            "fixed inset-0 z-[55] bg-black/50 transition-opacity md:hidden",
+            "fixed inset-0 z-[55] bg-black/50 transition-opacity lg:hidden",
             open ? "opacity-100" : "pointer-events-none opacity-0",
           )}
           onClick={() => setOpen(false)}
@@ -403,33 +442,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <aside
           className={cn(
-            "fixed inset-y-0 start-0 z-[60] flex w-[min(86vw,17.5rem)] flex-col border-e border-[var(--border)] bg-[var(--surface)] transition-transform duration-250 ease-out pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] md:w-[17.5rem]",
-            open ? "translate-x-0" : "-translate-x-full",
+            "nj-sidebar fixed inset-y-0 start-0 z-[60] flex flex-col border-e border-[var(--border)] bg-[var(--surface)] transition-transform duration-200 ease-out pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
+            open
+              ? "translate-x-0"
+              : "-translate-x-full rtl:translate-x-full",
           )}
         >
-          <DrawerContent
-            onNavigate={() => {
-              if (window.matchMedia("(max-width: 767px)").matches) {
-                setOpen(false);
-              }
-            }}
-          />
+          <DrawerContent closeSidebar={() => setOpen(false)} />
         </aside>
 
         <div
           className={cn(
-            "hidden shrink-0 transition-[width] duration-250 md:block",
-            open ? "w-[17.5rem]" : "w-0",
+            "nj-sidebar-spacer hidden shrink-0 transition-[width] duration-200 lg:block",
+            open ? "nj-sidebar-spacer-open" : "w-0",
           )}
           aria-hidden
         />
 
         <div
           className={cn(
-            "flex h-full min-h-0 min-w-0 flex-1 flex-col overscroll-contain bg-[var(--bg)]",
-            pathname.startsWith("/app/chat") ? "overflow-hidden" : "overflow-y-auto",
+            "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overscroll-contain bg-[var(--bg)]",
+            pathname.startsWith("/app/chat")
+              ? "overflow-hidden"
+              : "overflow-x-hidden overflow-y-auto",
           )}
         >
+          <ProMonthNotice />
           {children}
         </div>
       </div>
@@ -438,24 +476,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 export function AppMenuButton({ className }: { className?: string }) {
-  const { open, setOpen } = useAppSidebar();
+  const { open, toggle } = useAppSidebar();
 
+  /** Exit (close sidebar) — icon like ChatGPT PanelLeftClose */
   if (open) {
-    return <div className={cn("h-10 w-10 shrink-0", className)} aria-hidden />;
+    return (
+      <button
+        type="button"
+        onClick={() => toggle()}
+        className={cn(
+          "nj-panel-btn relative z-[70] grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--fg)] transition hover:bg-[var(--surface-2)] active:scale-[0.96]",
+          className,
+        )}
+        aria-label="Close menu"
+        aria-expanded
+        title="Баромадан / Close"
+      >
+        <PanelLeftClose className="h-5 w-5" strokeWidth={1.5} />
+      </button>
+    );
   }
 
+  /** Enter (open sidebar) — mirrored PanelLeftOpen */
   return (
     <button
       type="button"
-      onClick={() => setOpen(true)}
+      onClick={() => toggle()}
       className={cn(
-        "relative z-[70] grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--surface-3)] text-[var(--fg)] hover:bg-[var(--surface-2)]",
+        "nj-panel-btn relative z-[70] grid h-9 w-9 shrink-0 place-items-center rounded-full text-[var(--fg)] transition hover:bg-[var(--surface-2)] active:scale-[0.96]",
         className,
       )}
       aria-label="Open menu"
       aria-expanded={false}
+      title="Даромадан / Open"
     >
-      <Menu className="h-5 w-5" />
+      <PanelLeftOpen className="h-5 w-5" strokeWidth={1.5} />
     </button>
   );
 }

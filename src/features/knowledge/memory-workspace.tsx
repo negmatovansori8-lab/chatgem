@@ -1,203 +1,226 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Brain, Pencil, Trash2 } from "lucide-react";
-import { AppBackButton } from "@/components/layout/app-back-button";
+import { WorkspaceHeader } from "@/components/layout/workspace-header";
 import { useI18n } from "@/components/i18n/locale-provider";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/toast";
+import { HttpError, jsonInit, requestJson } from "@/lib/http";
 import { cn } from "@/lib/utils";
 import type { MemoryRecord } from "@/types/knowledge";
 
+type MemoryResponse = { memories?: MemoryRecord[]; enabled?: boolean };
+
 export function MemoryWorkspace() {
   const { t } = useI18n();
+  const toast = useToast();
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
   const [enabled, setEnabled] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("");
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
 
-  async function refresh() {
-    const res = await fetch("/api/memory");
-    const data = await res.json();
-    setMemories(data.memories ?? []);
-    setEnabled(Boolean(data.enabled));
-  }
+  const fail = useCallback(
+    (e: unknown) => toast.error(e instanceof HttpError && e.offline ? t("common.offline") : t("common.requestFailed")),
+    [t, toast],
+  );
+
+  const refresh = useCallback(
+    () =>
+      requestJson<MemoryResponse>("/api/memory")
+        .then((data) => {
+          setMemories(data.memories ?? []);
+          setEnabled(Boolean(data.enabled));
+          setLoadError(false);
+        })
+        .catch(() => setLoadError(true))
+        .finally(() => setLoading(false)),
+    [],
+  );
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [refresh]);
+
+  async function run(action: () => Promise<unknown>) {
+    try {
+      await action();
+      await refresh();
+    } catch (e) {
+      fail(e);
+    }
+  }
 
   async function toggleEnabled() {
     const next = !enabled;
-    await fetch("/api/memory", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled: next }),
-    });
-    setEnabled(next);
+    try {
+      await requestJson("/api/memory", jsonInit("POST", { enabled: next }));
+      setEnabled(next);
+    } catch (e) {
+      fail(e);
+    }
   }
 
   async function onCreate(event: FormEvent) {
     event.preventDefault();
-    if (!content.trim()) return;
-    await fetch("/api/memory", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, category: category || undefined }),
+    if (!content.trim() || saving) return;
+    setSaving(true);
+    await run(async () => {
+      await requestJson("/api/memory", jsonInit("POST", { content: content.trim(), category: category.trim() || undefined }));
+      setContent("");
+      setCategory("");
     });
-    setContent("");
-    setCategory("");
-    await refresh();
+    setSaving(false);
   }
 
   async function onSaveEdit(id: string) {
     if (!editText.trim()) return;
-    await fetch(`/api/memory/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: editText.trim() }),
+    await run(async () => {
+      await requestJson(`/api/memory/${id}`, jsonInit("PATCH", { content: editText.trim() }));
+      setEditingId(null);
+      setEditText("");
     });
-    setEditingId(null);
-    setEditText("");
-    await refresh();
-  }
-
-  async function onToggleItem(memory: MemoryRecord) {
-    await fetch(`/api/memory/${memory.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled: !memory.enabled }),
-    });
-    await refresh();
-  }
-
-  async function onDelete(id: string) {
-    await fetch(`/api/memory/${id}`, { method: "DELETE" });
-    await refresh();
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 max-w-lg flex-col bg-[var(--bg)] text-[var(--fg)]">
-      <header className="flex shrink-0 items-center gap-2 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <AppBackButton />
-        <h1 className="flex-1 text-center text-[17px] font-semibold">
-          {t("memory.title")}
-        </h1>
-        <div className="w-10" />
-      </header>
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-[var(--bg)] text-[var(--fg)] md:max-w-xl">
+      <WorkspaceHeader title={t("memory.title")} />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
-        <p className="mb-4 text-center text-sm text-[var(--fg-subtle)]">{t("memory.subtitle")}</p>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-4">
+        <p className="mb-4 text-center text-sm text-[var(--fg-muted)]">{t("memory.subtitle")}</p>
 
         <button
           type="button"
+          role="switch"
+          aria-checked={enabled}
           onClick={() => void toggleEnabled()}
           className={cn(
-            "mb-5 flex w-full items-center justify-between rounded-2xl px-4 py-3.5",
-            enabled ? "bg-emerald-500/15 text-emerald-300" : "bg-[#1a1a1a] text-white/50",
+            "mb-5 flex min-h-12 w-full items-center justify-between rounded-[var(--radius-lg)] border px-4 py-3 transition",
+            enabled
+              ? "border-transparent bg-[var(--accent-muted)] text-[var(--accent-2)]"
+              : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)]",
           )}
         >
           <span className="inline-flex items-center gap-2 text-[15px] font-medium">
             <Brain className="h-5 w-5" />
             {enabled ? t("memory.on") : t("memory.off")}
           </span>
-          <span className="text-xs opacity-70">
-            {enabled ? t("memory.enabled") : t("memory.disabled")}
-          </span>
+          <span className="text-xs opacity-80">{enabled ? t("memory.enabled") : t("memory.disabled")}</span>
         </button>
 
-        <form onSubmit={onCreate} className="mb-5 space-y-2 rounded-2xl bg-[#1a1a1a] p-3">
-          <textarea
+        <form
+          onSubmit={onCreate}
+          className="mb-5 space-y-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-3"
+        >
+          <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder={t("memory.add")}
             rows={3}
-            className="w-full resize-none rounded-xl bg-transparent px-2 py-2 text-[15px] outline-none placeholder:text-white/35"
+            className="min-h-[88px] resize-none"
           />
-          <input
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder={t("memory.category")}
-            className="w-full rounded-xl bg-black/40 px-3 py-2.5 text-sm outline-none placeholder:text-white/35"
-          />
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-[#3b82f6] py-3 text-sm font-semibold"
-          >
+          <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder={t("memory.category")} />
+          <Button type="submit" size="lg" className="w-full" disabled={saving || !content.trim()}>
             {t("memory.save")}
-          </button>
+          </Button>
         </form>
 
-        {!memories.length ? (
-          <p className="py-8 text-center text-sm text-white/35">{t("memory.empty")}</p>
-        ) : null}
-
-        <ul className="space-y-2">
-          {memories.map((memory) => (
-            <li key={memory.id} className="rounded-2xl bg-[#1a1a1a] p-4">
-              {editingId === memory.id ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    rows={3}
-                    className="w-full resize-none rounded-xl bg-black/40 px-3 py-2 text-sm outline-none"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void onSaveEdit(memory.id)}
-                      className="flex-1 rounded-xl bg-[#3b82f6] py-2 text-sm font-semibold"
-                    >
-                      {t("common.save")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(null)}
-                      className="rounded-xl bg-white/10 px-4 py-2 text-sm"
-                    >
-                      {t("common.cancel")}
-                    </button>
+        {loading ? (
+          <div className="space-y-2" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-20 animate-pulse rounded-[var(--radius-lg)] bg-[var(--surface-2)]" />
+            ))}
+          </div>
+        ) : loadError ? (
+          <EmptyState
+            title={t("common.requestFailed")}
+            actions={
+              <Button variant="secondary" onClick={() => void refresh()}>
+                {t("common.retry")}
+              </Button>
+            }
+          />
+        ) : !memories.length ? (
+          <EmptyState icon={<Brain className="h-6 w-6" />} title={t("memory.empty")} className="py-8" />
+        ) : (
+          <ul className="space-y-2">
+            {memories.map((memory) => (
+              <li
+                key={memory.id}
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4"
+              >
+                {editingId === memory.id ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      rows={3}
+                      className="min-h-[88px] resize-none"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <Button className="flex-1" onClick={() => void onSaveEdit(memory.id)}>
+                        {t("common.save")}
+                      </Button>
+                      <Button variant="secondary" onClick={() => setEditingId(null)}>
+                        {t("common.cancel")}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <>
-                  <p className="text-sm text-white/90">{memory.content}</p>
-                  <p className="mt-1 text-[11px] text-white/35">
-                    {memory.category || t("memory.general")} ·{" "}
-                    {memory.enabled ? t("memory.enabled") : t("memory.disabled")}
-                  </p>
-                  <div className="mt-3 flex gap-1">
-                    <button
-                      type="button"
-                      className="rounded-lg px-3 py-1.5 text-xs text-white/50 hover:bg-white/10"
-                      onClick={() => void onToggleItem(memory)}
-                    >
-                      {memory.enabled ? t("memory.turnOff") : t("memory.turnOn")}
-                    </button>
-                    <button
-                      type="button"
-                      className="grid h-8 w-8 place-items-center rounded-lg text-white/40 hover:bg-white/10"
-                      onClick={() => {
-                        setEditingId(memory.id);
-                        setEditText(memory.content);
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className="grid h-8 w-8 place-items-center rounded-lg text-white/40 hover:text-red-400"
-                      onClick={() => void onDelete(memory.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
+                ) : (
+                  <>
+                    <p className="whitespace-pre-wrap break-words text-sm text-[var(--fg)]">{memory.content}</p>
+                    <p className="mt-1 text-xs text-[var(--fg-subtle)]">
+                      {memory.category || t("memory.general")} ·{" "}
+                      {memory.enabled ? t("memory.enabled") : t("memory.disabled")}
+                    </p>
+                    <div className="mt-3 flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          void run(() =>
+                            requestJson(`/api/memory/${memory.id}`, jsonInit("PATCH", { enabled: !memory.enabled })),
+                          )
+                        }
+                      >
+                        {memory.enabled ? t("memory.turnOff") : t("memory.turnOn")}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t("common.edit")}
+                        onClick={() => {
+                          setEditingId(memory.id);
+                          setEditText(memory.content);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t("common.delete")}
+                        className="hover:text-[var(--danger)]"
+                        onClick={() => void run(() => requestJson(`/api/memory/${memory.id}`, jsonInit("DELETE")))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

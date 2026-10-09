@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   images: {
     formats: ["image/avif", "image/webp"],
+    localPatterns: [
+      { pathname: "/**", search: "" },
+      { pathname: "/**", search: "?v=chatgem-c" },
+    ],
   },
   async headers() {
     return [
@@ -19,7 +23,7 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(self), geolocation=()",
+            value: "camera=(), microphone=(self), geolocation=(self)",
           },
           {
             key: "Content-Security-Policy",
@@ -28,6 +32,7 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
+              // Legal media previews/streams played in chat (store previews, Commons, Jamendo).
               "media-src 'self' data: blob:",
               "font-src 'self' data:",
               "connect-src 'self' https://api.openai.com https://api.groq.com https://api.tavily.com https://image.pollinations.ai https://*.openai.com https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com",

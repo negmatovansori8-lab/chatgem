@@ -21,8 +21,7 @@ export async function GET() {
       {
         error: {
           code: "FORBIDDEN",
-          message:
-            "Танҳо админ дастрасӣ дорад. Бо почтаи админ ворид шавед (масалан negmatovansori8@gmail.com).",
+          message: "Танҳо админ дастрасӣ дорад.",
         },
       },
       { status: 403 },

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Calculator,
   ChevronRight,
   Code2,
@@ -13,12 +12,15 @@ import {
   Search,
   Check,
 } from "lucide-react";
+import { AppBackButton } from "@/components/layout/app-back-button";
 import { useI18n } from "@/components/i18n/locale-provider";
+import { requestJson } from "@/lib/http";
 import {
   PLUGIN_CATALOG,
   PLUGIN_SECTIONS,
   type PluginDef,
 } from "@/features/tools/plugins-catalog";
+import { localizedCopy } from "@/features/tools/plugin-labels";
 
 type ToolCard = {
   slug: string;
@@ -54,7 +56,7 @@ function saveInstalled(ids: string[]) {
 }
 
 export function ToolsHubWorkspace() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const [tools, setTools] = useState<ToolCard[]>([]);
   const [query, setQuery] = useState("");
@@ -64,22 +66,28 @@ export function ToolsHubWorkspace() {
 
   useEffect(() => {
     setInstalled(loadInstalled());
-    void fetch("/api/tools")
-      .then((r) => r.json())
-      .then((data) => setTools(data.tools ?? []));
+    requestJson<{ tools?: ToolCard[] }>("/api/tools")
+      .then((data) => setTools(data.tools ?? []))
+      .catch(() => setTools([]));
   }, []);
 
   const q = query.trim().toLowerCase();
 
   const catalog = useMemo(() => {
     if (!q) return PLUGIN_CATALOG;
-    return PLUGIN_CATALOG.filter(
-      (p) =>
+    return PLUGIN_CATALOG.filter((p) => {
+      const copy = localizedCopy(locale, p.id, {
+        name: p.name,
+        desc: p.description,
+      });
+      return (
+        copy.name.toLowerCase().includes(q) ||
+        copy.desc.toLowerCase().includes(q) ||
         p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.section.includes(q),
-    );
-  }, [q]);
+        p.section.includes(q)
+      );
+    });
+  }, [q, locale]);
 
   const installedPlugins = useMemo(
     () => PLUGIN_CATALOG.filter((p) => installed.includes(p.id)),
@@ -114,20 +122,13 @@ export function ToolsHubWorkspace() {
   }
 
   return (
-    <div className="relative mx-auto flex min-h-full max-w-lg flex-col bg-[var(--bg)] px-3 pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))] pt-2 text-[var(--fg)] sm:px-4">
+    <div className="relative mx-auto flex min-h-full w-full max-w-lg flex-col bg-[var(--bg)] px-3 pb-[max(7rem,calc(env(safe-area-inset-bottom)+5.5rem))] pt-[max(0.5rem,env(safe-area-inset-top))] text-[var(--fg)] sm:px-4">
       <header className="mb-4 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="grid h-10 w-10 place-items-center rounded-full bg-[var(--surface-3)] text-[var(--fg)]"
-          aria-label="Back"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <h1 className="flex-1 text-center text-[17px] font-semibold text-[var(--fg)]">
+        <AppBackButton />
+        <h1 className="flex-1 truncate text-center text-[17px] font-semibold text-[var(--fg)]">
           {t("plugins.title")}
         </h1>
-        <div className="w-10" />
+        <div className="w-10 shrink-0" />
       </header>
 
       <p className="mb-4 rounded-2xl bg-[var(--surface)] px-4 py-3 text-[13px] leading-relaxed text-[var(--fg-muted)]">
@@ -158,11 +159,11 @@ export function ToolsHubWorkspace() {
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-medium text-[var(--fg)]">
-                    {tool.name}
+                  <p className="text-[15px] font-medium leading-snug text-[var(--fg)]">
+                    {localizedCopy(locale, tool.slug, { name: tool.name, desc: tool.description }).name}
                   </p>
-                  <p className="truncate text-xs text-[var(--fg-subtle)]">
-                    {tool.description}
+                  <p className="line-clamp-2 text-xs leading-snug text-[var(--fg-subtle)]">
+                    {localizedCopy(locale, tool.slug, { name: tool.name, desc: tool.description }).desc}
                   </p>
                 </div>
                 <Check className="h-4 w-4 text-emerald-500" />
@@ -183,11 +184,11 @@ export function ToolsHubWorkspace() {
                 {plugin.letter}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-medium text-[var(--fg)]">
-                  {plugin.name}
+                <p className="text-[15px] font-medium leading-snug text-[var(--fg)]">
+                  {localizedCopy(locale, plugin.id, { name: plugin.name, desc: plugin.description }).name}
                 </p>
-                <p className="truncate text-xs text-[var(--fg-subtle)]">
-                  {plugin.description}
+                <p className="line-clamp-2 text-xs leading-snug text-[var(--fg-subtle)]">
+                  {localizedCopy(locale, plugin.id, { name: plugin.name, desc: plugin.description }).desc}
                 </p>
               </div>
               <Check className="h-4 w-4 text-emerald-500" />
@@ -210,7 +211,7 @@ export function ToolsHubWorkspace() {
             <button
               type="button"
               onClick={() => toggleSection(section.id)}
-              className="mb-2 flex w-full items-center gap-1 px-1 text-[13px] font-semibold text-[var(--fg-subtle)]"
+              className="mb-1 flex min-h-10 w-full items-center gap-1 rounded-[var(--radius-md)] px-1 text-[13px] font-semibold text-[var(--fg-subtle)]"
             >
               {t(section.labelKey)}
               <ChevronRight
@@ -238,11 +239,11 @@ export function ToolsHubWorkspace() {
                           {plugin.letter}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[15px] font-medium text-[var(--fg)]">
-                            {plugin.name}
+                          <p className="text-[15px] font-medium leading-snug text-[var(--fg)]">
+                            {localizedCopy(locale, plugin.id, { name: plugin.name, desc: plugin.description }).name}
                           </p>
-                          <p className="truncate text-xs text-[var(--fg-subtle)]">
-                            {plugin.description}
+                          <p className="line-clamp-2 text-xs leading-snug text-[var(--fg-subtle)]">
+                            {localizedCopy(locale, plugin.id, { name: plugin.name, desc: plugin.description }).desc}
                           </p>
                           {plugin.needsOAuth ? (
                             <p className="mt-0.5 text-[11px] text-[var(--fg-subtle)]">
@@ -267,7 +268,7 @@ export function ToolsHubWorkspace() {
                           onClick={() => {
                             addPlugin(plugin);
                             setNotice(
-                              `${plugin.name}: ${t("plugins.skillReady")}`,
+                              `${localizedCopy(locale, plugin.id, { name: plugin.name, desc: plugin.description }).name}: ${t("plugins.skillReady")}`,
                             );
                           }}
                           aria-label="Add"

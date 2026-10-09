@@ -1,11 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { Children, isValidElement, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
+import rehypeKatex from "rehype-katex";
+import { normalizeMath } from "@/lib/markdown-math";
 import { cn } from "@/lib/utils";
+import { DownloadButton } from "@/components/media/download-button";
+import { mediaKindOf, mimeFromUrl } from "@/lib/downloads/filename";
+import { isDownloadable } from "@/lib/downloads/policy";
+import { pageOrigin } from "@/lib/downloads/client";
+import { splitMediaBlocks } from "@/lib/media/chat-block";
+import { MediaResults } from "@/features/media-search/media-results";
 import "highlight.js/styles/github-dark.min.css";
+import "katex/dist/katex.min.css";
+
+function nodeText(node: ReactNode): string {
+  return Children.toArray(node)
+    .map((child) =>
+      typeof child === "string" || typeof child === "number"
+        ? String(child)
+        : isValidElement<{ children?: ReactNode }>(child)
+          ? nodeText(child.props.children)
+          : "",
+    )
+    .join("");
+}
+
+/** Direct link to an allowed video/audio file → inline player + Download (phrasing content only: it sits inside <p>). */
+function MediaLink({ href, children }: { href: string; children: ReactNode }) {
+  const mime = mimeFromUrl(href);
+  const kind = mediaKindOf(mime);
+  const label = nodeText(children).trim();
+  const title = label && label !== href ? label : undefined;
+  const [artist, song] = kind === "audio" && title?.includes(" - ") ? title.split(" - ", 2) : [undefined, title];
+  return (
+    <span className="my-2 block space-y-2">
+      {kind === "video" ? (
+        <video
+          src={href}
+          controls
+          playsInline
+          preload="metadata"
+          className="block max-h-[min(70vh,520px)] w-full rounded-2xl border border-[var(--border)] bg-black"
+        />
+      ) : (
+        <audio src={href} controls preload="metadata" className="block w-full" />
+      )}
+      <span className="flex flex-wrap items-center gap-2">
+        {title ? <span className="min-w-0 truncate text-sm text-[var(--fg-muted)]">{title}</span> : null}
+        <DownloadButton source={{ url: href }} meta={{ title: song, artist, mimeType: mime }} />
+      </span>
+    </span>
+  );
+}
 
 function CopyBtn({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -28,20 +78,59 @@ function CopyBtn({ text }: { text: string }) {
 export function MarkdownMessage({
   content,
   className,
+  onMapLink,
+  onPrompt,
 }: {
   content: string;
   className?: string;
+  /** In-app map links (`/app/maps?…`) open the chat's map instead of a new tab. */
+  onMapLink?: (href: string) => void;
+  /** Media search suggestions send a new chat message. */
+  onPrompt?: (text: string) => void;
+}) {
+  const text =
+    typeof content === "string"
+      ? content
+      : content == null
+        ? ""
+        : JSON.stringify(content);
+  const segments = splitMediaBlocks(text);
+  if (segments.length === 1 && segments[0]!.type === "markdown") {
+    return <MarkdownBody text={text} className={className} onMapLink={onMapLink} />;
+  }
+  return (
+    <div className="space-y-3">
+      {segments.map((segment, i) =>
+        segment.type === "media" ? (
+          <MediaResults key={i} result={segment.result} onPrompt={onPrompt} />
+        ) : (
+          <MarkdownBody key={i} text={segment.text} className={className} onMapLink={onMapLink} />
+        ),
+      )}
+    </div>
+  );
+}
+
+function MarkdownBody({
+  text,
+  className,
+  onMapLink,
+}: {
+  text: string;
+  className?: string;
+  onMapLink?: (href: string) => void;
 }) {
   return (
     <div
+      data-markdown
       className={cn(
-        "prose-chat space-y-3 text-[15px] leading-7 text-[var(--fg)]",
+        "prose-chat space-y-3 break-words text-[15px] leading-7 text-[var(--fg)]",
         className,
       )}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: "ignore" }], rehypeHighlight]}
         urlTransform={(url) => {
           const value = String(url || "");
           if (
@@ -56,16 +145,33 @@ export function MarkdownMessage({
           return "";
         }}
         components={{
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="break-all text-[var(--accent-2)] underline underline-offset-2"
-            >
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) =>
+            href &&
+            /^(?:video|audio)$/.test(mediaKindOf(mimeFromUrl(href))) &&
+            isDownloadable(href, pageOrigin()) ? (
+              <MediaLink href={href}>{children}</MediaLink>
+            ) : onMapLink && href?.startsWith("/app/maps") ? (
+              <a
+                href={href}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                  e.preventDefault();
+                  onMapLink(href);
+                }}
+                className="font-medium text-[var(--accent-2)] underline underline-offset-2"
+              >
+                {children}
+              </a>
+            ) : (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all text-[var(--accent-2)] underline underline-offset-2"
+              >
+                {children}
+              </a>
+            ),
           code: ({ className: cls, children, ...props }) => {
             const isBlock = Boolean(cls?.includes("language-") || cls?.includes("hljs"));
             if (!isBlock) {
@@ -139,17 +245,22 @@ export function MarkdownMessage({
             </blockquote>
           ),
           img: ({ src, alt }) =>
-            src ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={src}
-                alt={alt || ""}
-                className="my-2 max-h-[min(70vh,520px)] w-full rounded-2xl border border-[var(--border)] object-contain bg-[var(--surface)]"
-              />
+            typeof src === "string" && src ? (
+              <span className="my-2 block space-y-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={src}
+                  alt={alt || ""}
+                  className="block max-h-[min(70vh,520px)] w-full rounded-2xl border border-[var(--border)] object-contain bg-[var(--surface)]"
+                />
+                {isDownloadable(src, pageOrigin()) ? (
+                  <DownloadButton source={{ url: src }} meta={{ title: alt || undefined }} />
+                ) : null}
+              </span>
             ) : null,
         }}
       >
-        {content}
+        {normalizeMath(text)}
       </ReactMarkdown>
     </div>
   );

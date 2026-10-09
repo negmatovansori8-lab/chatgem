@@ -63,19 +63,27 @@ export function FilesWorkspace() {
     toast.info(t("common.delete"));
   }
 
+  const fileInput = (
+    <input
+      ref={inputRef}
+      type="file"
+      className="hidden"
+      accept=".pdf,.txt,.doc,.docx,.md,.json,image/*,text/*,.js,.ts,.tsx,.py,.css,.html"
+      onChange={(e) => void onUpload(e.target.files)}
+    />
+  );
+
   return (
-    <div className="mx-auto flex h-full min-h-0 max-w-lg flex-col bg-[var(--bg)] text-[var(--fg)]">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-1 flex-col bg-[var(--bg)] text-[var(--fg)] md:max-w-xl lg:max-w-2xl">
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <AppBackButton className="max-w-[7rem]" />
-        <h1 className="flex-1 text-center text-[17px] font-semibold">
+        <AppBackButton />
+        <h1 className="flex-1 truncate text-center text-[17px] font-semibold">
           {t("files.title")}
         </h1>
-        <div className="w-10" />
+        <div className="w-10 shrink-0" />
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
-        <p className="mb-4 text-center text-sm text-[var(--fg-muted)]">{t("files.subtitle")}</p>
-
+      {!files.length ? (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -95,31 +103,39 @@ export function FilesWorkspace() {
             void onUpload(e.dataTransfer.files);
           }}
           className={cn(
-            "mb-5 flex w-full flex-col items-center gap-2 rounded-2xl border border-dashed px-4 py-8 transition disabled:opacity-50",
+            "mx-4 mb-[max(1rem,env(safe-area-inset-bottom))] mt-3 flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-3xl border border-dashed px-6 text-center transition disabled:opacity-50",
             dragOver
               ? "border-[var(--accent)] bg-[var(--accent)]/10"
               : "border-[var(--border)] bg-[var(--surface)]",
           )}
         >
-          <input
-            ref={inputRef}
-            type="file"
-            className="hidden"
-            accept=".pdf,.txt,.doc,.docx,.md,.json,image/*,text/*,.js,.ts,.tsx,.py,.css,.html"
-            onChange={(e) => void onUpload(e.target.files)}
-          />
-          <Upload className="h-7 w-7 text-[var(--fg-subtle)]" />
-          <span className="text-[15px] font-medium">
+          {fileInput}
+          <Upload className="h-8 w-8 text-[var(--fg-subtle)]" />
+          <span className="text-[17px] font-semibold">
             {uploading ? t("files.uploading") : t("files.upload")}
           </span>
-          <span className="text-xs text-[var(--fg-subtle)]">{t("files.formats")}</span>
-          <span className="text-[11px] text-[var(--fg-subtle)]">{t("gallery.drop")}</span>
+          <span className="text-sm text-[var(--fg-muted)]">{t("files.empty")}</span>
+          <span className="max-w-[16rem] text-xs leading-relaxed text-[var(--fg-subtle)]">
+            {t("files.hint")}
+          </span>
+          <span className="text-[11px] text-[var(--fg-subtle)]">{t("files.formats")}</span>
+          {error ? <span className="text-xs text-[var(--danger)]">{error}</span> : null}
+        </button>
+      ) : null}
+
+      {files.length ? (
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="mb-4 mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--surface)] px-4 text-[15px] font-medium disabled:opacity-50"
+        >
+          {fileInput}
+          <Upload className="h-4 w-4" />
+          {uploading ? t("files.uploading") : t("files.upload")}
         </button>
         {error ? <p className="mb-3 text-center text-xs text-[var(--danger)]">{error}</p> : null}
-
-        {!files.length ? (
-          <p className="py-6 text-center text-sm text-[var(--fg-subtle)]">{t("files.empty")}</p>
-        ) : null}
 
         <ul className="space-y-2">
           {files.map((file) => (
@@ -162,6 +178,7 @@ export function FilesWorkspace() {
           </div>
         ) : null}
       </div>
+      ) : null}
     </div>
   );
 }

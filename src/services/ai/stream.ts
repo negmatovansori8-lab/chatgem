@@ -1,3 +1,4 @@
+import { isProviderDown, providerOfModel } from "@/lib/provider-health";
 import { detectIntent } from "@/services/ai/router";
 import {
   FREE_LIMITS,
@@ -26,13 +27,14 @@ type VisionPart =
 /** Best → free fallbacks. Always answer if any key works. */
 const QUALITY_ORDER = [
   "openai/gpt-4o",
+  "google/gemini-flash",
   "openai/gpt-4o-mini",
   "groq/openai/gpt-oss-120b",
   "groq/openai/gpt-oss-20b",
   "groq/qwen/qwen3.8-27b",
 ] as const;
 
-const VISION_ORDER = ["openai/gpt-4o", "openai/gpt-4o-mini"] as const;
+const VISION_ORDER = ["openai/gpt-4o", "google/gemini-flash", "openai/gpt-4o-mini"] as const;
 
 function configuredModels() {
   return listSelectableModels().filter((m) => m.configured);
@@ -66,7 +68,8 @@ function buildModelQueue(
   }
   for (const m of models) push(m.id);
 
-  return queue;
+  const healthy = queue.filter((id) => !isProviderDown(providerOfModel(id)));
+  return healthy.length ? healthy : queue;
 }
 
 function friendlyProviderError(raw: string) {
@@ -99,7 +102,7 @@ function buildUserContent(
   if (!images.length) return prompt;
 
   const parts: VisionPart[] = [{ type: "text", text: prompt }];
-  for (const url of images.slice(0, 4)) {
+  for (const url of images.slice(0, 6)) {
     parts.push({ type: "image_url", image_url: { url } });
   }
   return parts;
@@ -116,6 +119,8 @@ export async function* streamChatCompletion(input: {
   userId: string;
   systemPrompt?: string;
   imageDataUrls?: string[];
+  /** Raise the output budget for long deliverables (full prompts, specs, code). */
+  maxTokens?: number;
 }): AsyncGenerator<StreamEvent> {
   bootstrapProviders();
   const intent = detectIntent(input.prompt);
@@ -160,9 +165,9 @@ export async function* streamChatCompletion(input: {
   ];
 
   const isPro = await subscriptionRepository.isProOrBetter(input.userId);
-  // World-class replies: enough room + natural ChatGPT-like tone
-  const temperature = 0.45;
-  const maxTokens = isPro ? 8192 : 4500;
+  // Lower randomness: the free models invent names and dates more often at higher temperatures.
+  const temperature = 0.3;
+  const maxTokens = Math.max(isPro ? 8192 : 4500, input.maxTokens ?? 0);
 
   let lastError = "";
 
@@ -189,8 +194,8 @@ export async function* streamChatCompletion(input: {
       intent: needsVision ? "vision" : intent.intent,
     };
 
+    let text = "";
     try {
-      let text = "";
       for await (const token of provider.stream({
         modelId: id,
         messages,
@@ -216,8 +221,12 @@ export async function* streamChatCompletion(input: {
       lastError = raw;
       const friendly = friendlyProviderError(raw);
 
-      // If we already streamed a usable partial answer, keep it
-      // (checked via lastError only — tokens already sent to client)
+      // Tokens already reached the client: a second model would be appended to them.
+      if (text.trim().length >= 200) {
+        await usageRepository.increment(input.userId, "messages", 1);
+        yield { type: "done", chatId: "" };
+        return;
+      }
       if (i < queue.length - 1) {
         yield {
           type: "status",
