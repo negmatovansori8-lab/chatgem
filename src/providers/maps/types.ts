@@ -207,7 +207,11 @@ export type LocationErrorCode =
 export interface LocationProvider {
   readonly id: string;
   isSupported(): boolean;
-  getCurrentPosition(opts?: { timeoutMs?: number; maximumAge?: number }): Promise<LocationFix>;
+  getCurrentPosition(opts?: {
+    timeoutMs?: number;
+    maximumAge?: number;
+    highAccuracy?: boolean;
+  }): Promise<LocationFix>;
 }
 
 export interface SearchProvider {

@@ -20,7 +20,11 @@ export class BrowserLocationProvider implements LocationProvider {
     return typeof navigator !== "undefined" && "geolocation" in navigator;
   }
 
-  getCurrentPosition(opts?: { timeoutMs?: number; maximumAge?: number }): Promise<LocationFix> {
+  getCurrentPosition(opts?: {
+    timeoutMs?: number;
+    maximumAge?: number;
+    highAccuracy?: boolean;
+  }): Promise<LocationFix> {
     return new Promise((resolve, reject) => {
       if (typeof window !== "undefined" && !window.isSecureContext) {
         reject(new LocationError("insecure_context"));
@@ -49,7 +53,7 @@ export class BrowserLocationProvider implements LocationProvider {
           });
         },
         {
-          enableHighAccuracy: true,
+          enableHighAccuracy: opts?.highAccuracy !== false,
           timeout: opts?.timeoutMs ?? 15_000,
           maximumAge: opts?.maximumAge ?? 30_000,
         },
@@ -68,7 +72,7 @@ export class BrowserLocationProvider implements LocationProvider {
           timestamp: pos.timestamp,
         }),
       () => undefined,
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
+      { enableHighAccuracy: false, maximumAge: 15_000, timeout: 20_000 },
     );
     return () => navigator.geolocation.clearWatch(id);
   }
@@ -89,7 +93,7 @@ export const browserLocation = new BrowserLocationProvider();
 /** A reading worse than this is a Wi-Fi/cell guess, not a GPS fix. Never plot it. */
 export const GPS_MAX_ACCURACY_M = 100;
 
-export function isGpsFix(fix: LocationFix | null | undefined): fix is LocationFix {
+export function isGpsFix(fix: LocationFix | null | undefined): boolean {
   return Boolean(
     fix &&
       !fix.approximate &&

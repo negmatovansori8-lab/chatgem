@@ -842,7 +842,7 @@ export function MapsWorkspace({
     const fix = getLatestFix();
     if (!fix) return;
     // 0 = city estimate, 1 = coarse Wi-Fi area, 2 = real GPS. A better fix may reframe the map.
-    const rank = isGpsFix(fix) ? 2 : 0;
+    const rank = isGpsFix(fix) ? 2 : fix.approximate ? 0 : 1;
     if (handledFixRank.current != null && handledFixRank.current >= rank) return;
     handledFixRank.current = rank;
     onLocationRef.current(fix);
@@ -1102,7 +1102,7 @@ export function MapsWorkspace({
 
   async function locateMe() {
     const fix = await geo.locate({ fresh: true });
-    if (!fix || !isGpsFix(fix)) return;
+    if (!fix) return;
     const map = mapRef.current;
     if (map) map.flyTo([fix.location.lat, fix.location.lng], GPS_ZOOM, { duration: 0.7 });
     else setFit({ key: `me:${Date.now()}`, points: fixPoints(fix) });
@@ -1111,7 +1111,7 @@ export function MapsWorkspace({
 
   async function submitNearby(value: string) {
     if (!value.trim()) return;
-    if (!isGpsFix(geo.getLatest())) {
+    if (!geo.getLatest()) {
       const fix = await geo.locate({ fresh: true });
       if (!fix) return;
     }

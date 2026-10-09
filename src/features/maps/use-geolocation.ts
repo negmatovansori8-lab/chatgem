@@ -1,15 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LocationError, browserLocation, isGpsFix } from "@/lib/maps/location";
+import { LocationError, approximateLocation, browserLocation, isGpsFix } from "@/lib/maps/location";
 import type { LocationErrorCode, LocationFix, LocationProvider } from "@/providers/maps/types";
 
 export type GeoStatus = "idle" | "locating" | "ready" | "error";
 
-/** How long to wait for a real GPS fix before giving up. */
-const GPS_WAIT_MS = 20_000;
-/** After a coarse network reading, keep listening this long for GPS to refine it. */
-const REFINE_MS = 8_000;
+/** How long to wait for a precise GPS fix before keeping a network reading. */
+const GPS_WAIT_MS = 12_000;
+/** A computer has no GPS chip; accept a Wi-Fi or IP reading after this. */
+const COARSE_WAIT_MS = 4_000;
+
+function usable(fix: LocationFix): LocationFix {
+  return isGpsFix(fix) ? { ...fix, approximate: false } : { ...fix, approximate: true };
+}
+
+function prefer(prev: LocationFix | null, next: LocationFix): LocationFix {
+  const candidate = usable(next);
+  if (!prev) return candidate;
+  if (isGpsFix(candidate) && !isGpsFix(prev)) return candidate;
+  if (!isGpsFix(candidate) && isGpsFix(prev)) return prev;
+  return candidate.accuracyMeters <= prev.accuracyMeters ? candidate : prev;
+}
 
 /**
  * Device GPS only. Prompts when `locate()` runs. A granted permission is
@@ -30,15 +42,14 @@ export function useGeolocation(provider: LocationProvider & {
   const stopWatch = useRef<(() => void) | null>(null);
 
   const apply = useCallback((f: LocationFix) => {
-    if (!isGpsFix(f)) return;
-    fixRef.current = f;
-    setFix(f);
+    const next = prefer(fixRef.current, f);
+    fixRef.current = next;
+    setFix(next);
   }, []);
 
   const startWatch = useCallback(() => {
     if (stopWatch.current || !provider.watch) return;
     stopWatch.current = provider.watch((f) => {
-      if (!isGpsFix(f)) return;
       apply(f);
       setStatus("ready");
       setError(null);
@@ -59,69 +70,86 @@ export function useGeolocation(provider: LocationProvider & {
       let hardTimer = 0;
       let refineTimer = 0;
 
-      const settle = (next: LocationFix | null, code: LocationErrorCode | null) => {
+      const finish = (next: LocationFix | null, code: LocationErrorCode | null) => {
         if (settled) return;
         settled = true;
         window.clearTimeout(hardTimer);
         window.clearTimeout(refineTimer);
         stopTemp?.();
         stopTemp = null;
-        if (next && isGpsFix(next)) {
+        if (next) {
           apply(next);
           setError(null);
           errorRef.current = null;
           setStatus("ready");
-          setPermission("granted");
+          if (!next.approximate) setPermission("granted");
           startWatch();
-          resolve(next);
+          resolve(fixRef.current);
           return;
         }
         const codeFinal = code ?? "gps_unavailable";
         errorRef.current = codeFinal;
         setError(codeFinal);
         if (codeFinal === "permission_denied") setPermission("denied");
-        const kept = isGpsFix(fixRef.current) ? fixRef.current : null;
-        if (!kept) {
-          fixRef.current = null;
-          setFix(null);
-          setStatus("error");
-        } else {
-          setStatus("ready");
+        fixRef.current = null;
+        setFix(null);
+        setStatus("error");
+        resolve(null);
+      };
+
+      const settle = (next: LocationFix | null, code: LocationErrorCode | null) => {
+        if (settled) return;
+        if (next) {
+          finish(next, null);
+          return;
         }
-        resolve(kept);
+        void approximateLocation().then((ip) => {
+          if (ip) finish(ip, null);
+          else finish(null, code);
+        });
+      };
+
+      let best: LocationFix | null = null;
+
+      const note = (f: LocationFix) => {
+        if (settled) return;
+        const next = prefer(best, f);
+        best = next;
+        apply(next);
+        setStatus("ready");
+        setError(null);
+        if (isGpsFix(next)) settle(next, null);
       };
 
       const listenForGps = () => {
         if (settled || stopTemp || !provider.watch) return;
-        stopTemp = provider.watch((f) => {
-          if (isGpsFix(f)) settle(f, null);
-        });
+        stopTemp = provider.watch((f) => note(f));
       };
 
-      hardTimer = window.setTimeout(() => settle(null, "gps_unavailable"), GPS_WAIT_MS);
+      hardTimer = window.setTimeout(() => settle(best, "gps_unavailable"), GPS_WAIT_MS);
+      refineTimer = window.setTimeout(() => {
+        if (best) settle(best, null);
+      }, COARSE_WAIT_MS);
 
-      void provider
-        .getCurrentPosition({ timeoutMs: GPS_WAIT_MS, maximumAge: opts?.fresh ? 0 : 0 })
-        .then((f) => {
-          if (settled) return;
-          if (isGpsFix(f)) {
-            settle(f, null);
-            return;
-          }
-          // A Wi-Fi/cell reading is not the user's position. Wait for GPS to refine it.
-          listenForGps();
-          if (!settled && !refineTimer) refineTimer = window.setTimeout(() => settle(null, "gps_unavailable"), REFINE_MS);
-        })
-        .catch((e: unknown) => {
-          if (settled) return;
-          const code = e instanceof LocationError ? e.code : "gps_unavailable";
-          if (code === "permission_denied" || code === "unsupported" || code === "insecure_context") {
-            settle(null, code);
-            return;
-          }
-          listenForGps();
-          if (!settled && !refineTimer) refineTimer = window.setTimeout(() => settle(null, code), REFINE_MS);
-        });
+      const ask = (highAccuracy: boolean, timeoutMs: number) =>
+        provider
+          .getCurrentPosition({
+            highAccuracy,
+            timeoutMs,
+            maximumAge: opts?.fresh ? 0 : 60_000,
+          })
+          .then((f) => note(f))
+          .catch((e: unknown) => {
+            if (settled) return;
+            const code = e instanceof LocationError ? e.code : "gps_unavailable";
+            if (code === "permission_denied" || code === "unsupported" || code === "insecure_context") {
+              settle(null, code);
+            }
+          });
+
+      listenForGps();
+      void ask(false, COARSE_WAIT_MS);
+      void ask(true, GPS_WAIT_MS);
     }).finally(() => {
       inflight.current = null;
     });
@@ -139,25 +167,34 @@ export function useGeolocation(provider: LocationProvider & {
       setPermission(state);
       if (state === "granted") await locate();
       else if (state === "denied") {
-        errorRef.current = "permission_denied";
-        setError("permission_denied");
-        setStatus("error");
+        const ip = await approximateLocation();
+        if (cancelled) return;
+        if (ip) {
+          apply(ip);
+          setStatus("ready");
+          setError(null);
+          errorRef.current = null;
+        } else {
+          errorRef.current = "permission_denied";
+          setError("permission_denied");
+          setStatus("error");
+        }
       }
       if (!cancelled) setAutoChecked(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [locate, provider]);
+  }, [apply, locate, provider]);
 
-  const getLatest = useCallback(() => (isGpsFix(fixRef.current) ? fixRef.current : null), []);
+  const getLatest = useCallback(() => fixRef.current, []);
   /** Why the last `locate()` failed (readable right after its promise resolves to null). */
   const getLastError = useCallback(() => errorRef.current, []);
 
   return useMemo(
     () => ({
-      fix: isGpsFix(fix) ? fix : null,
-      location: isGpsFix(fix) ? fix.location : null,
+      fix,
+      location: fix?.location ?? null,
       status,
       error,
       permission,
