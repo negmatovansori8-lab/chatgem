@@ -9,6 +9,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { forgetChat } from "@/features/chat/chat-memory";
 import { useChatList } from "@/features/chat/use-chat-api";
 import { HttpError, jsonInit, requestJson } from "@/lib/http";
 import { cn } from "@/lib/utils";
@@ -42,7 +43,18 @@ export function ChatHistoryPanel({ activeId }: { activeId?: string }) {
   }
 
   async function removeChat(id: string) {
-    if (!(await mutate(`/api/chats/${id}`, jsonInit("DELETE")))) return;
+    try {
+      await requestJson(`/api/chats/${id}`, jsonInit("DELETE"));
+    } catch (e) {
+      const missing = e instanceof HttpError && e.status === 404;
+      if (!missing) {
+        toast.error(e instanceof HttpError && e.offline ? t("common.offline") : t("chat.requestFailed"));
+        return;
+      }
+    }
+    forgetChat(id);
+    window.dispatchEvent(new Event("nj:chats-changed"));
+    await refresh();
     toast.success(t("chat.deleted"));
     if (activeId === id) router.push("/app/chat");
   }

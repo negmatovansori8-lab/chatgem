@@ -89,7 +89,15 @@ function DrawerContent({
   }
 
   async function deleteChat(id: string) {
-    if (!(await patchChat(id, jsonInit("DELETE")))) return;
+    try {
+      await requestJson(`/api/chats/${id}`, jsonInit("DELETE"));
+    } catch (e) {
+      const missing = e instanceof HttpError && e.status === 404;
+      if (!missing) {
+        toast.error(e instanceof HttpError && e.offline ? t("common.offline") : t("chat.requestFailed"));
+        return;
+      }
+    }
     setChats((prev) => prev.filter((c) => c.id !== id));
     window.dispatchEvent(new Event("nj:chats-changed"));
     toast.success(t("chat.deleted"));

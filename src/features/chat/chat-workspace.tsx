@@ -42,6 +42,7 @@ import {
   useModels,
   type MessageRecord,
 } from "@/features/chat/use-chat-api";
+import { recallThread, rememberThread } from "@/features/chat/chat-memory";
 import { getPlugin } from "@/features/tools/plugins-catalog";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { cn } from "@/lib/utils";
@@ -263,6 +264,66 @@ function compressImageToDataUrl(file: File) {
   });
 }
 
+function messagesToBubbles(records: MessageRecord[]): Bubble[] {
+  return dedupeBubbles(
+    records.map((m) => {
+      const raw =
+        typeof m.content === "string"
+          ? m.content
+          : m.content == null
+            ? ""
+            : JSON.stringify(m.content);
+      const imgMatch = raw.match(/!\[[^\]]*]\(((?:https?:\/\/|\/)[^)\s]+)\)/);
+      const junkImage = Boolean(imgMatch?.[1] && /pollinations\.ai/i.test(imgMatch[1]));
+      const imageUrl = junkImage ? undefined : imgMatch?.[1];
+      const content = imgMatch
+        ? raw
+            .replace(/!\[[^\]]*]\(((?:https?:\/\/|\/)[^)\s]+)\)\s*/g, "")
+            .replace(/https?:\/\/(?:image|gen)\.pollinations\.ai\/\S+/gi, "")
+            .trim()
+        : raw;
+      return {
+        id: m.id,
+        role: (m.role === "USER" ? "user" : "assistant") as "user" | "assistant",
+        content,
+        imageUrl,
+      };
+    }),
+  );
+}
+
+function snapshotThread(chatId: string, title: string, bubbles: Bubble[]) {
+  const stamp = new Date().toISOString();
+  const messages: MessageRecord[] = bubbles
+    .filter((bubble) => bubble.content.trim() || bubble.imageUrl)
+    .map((bubble) => ({
+      id: bubble.id,
+      chatId,
+      role: bubble.role === "user" ? "USER" : "ASSISTANT",
+      content:
+        bubble.imageUrl && !bubble.imageUrl.startsWith("data:")
+          ? `${bubble.content}\n\n![generated](${bubble.imageUrl})`
+          : bubble.content,
+      modelId: null,
+      createdAt: stamp,
+    }));
+  if (!messages.length) return;
+  const firstUser = messages.find((message) => message.role === "USER")?.content.slice(0, 60).trim();
+  rememberThread(
+    {
+      id: chatId,
+      userId: "local",
+      title: title && title !== "ChatGem" ? title : firstUser || "ChatGem",
+      modelId: null,
+      pinned: false,
+      archived: false,
+      createdAt: stamp,
+      updatedAt: stamp,
+    },
+    messages,
+  );
+}
+
 function dedupeBubbles(list: Bubble[]) {
   const seen = new Set<string>();
   const out: Bubble[] = [];
@@ -438,6 +499,12 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
         if (cancelled) return;
         // Stale URL after deploy / disk wipe — start clean, keep answering next message.
         if (!r.ok || !data.chat) {
+          const kept = recallThread(chatId);
+          if (kept) {
+            setTitle(kept.chat.title);
+            setMessages(messagesToBubbles(kept.messages));
+            return;
+          }
           setActiveChatId(undefined);
           streamChatIdRef.current = undefined;
           setMessages([]);
@@ -446,6 +513,9 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
             window.history.replaceState(null, "", "/app/chat");
           }
           return;
+        }
+        if (Array.isArray(data.messages)) {
+          rememberThread(data.chat, data.messages as MessageRecord[]);
         }
         if (sendingRef.current && streamChatIdRef.current === chatId) return;
         setTitle(data.chat.title);
@@ -981,7 +1051,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
               const keptImage = [...prev]
                 .reverse()
                 .find((m) => m.role === "assistant" && m.imageUrl)?.imageUrl;
-              return prev.map((m) =>
+              const next = prev.map((m) =>
                 m.id === assistantId
                   ? {
                       ...m,
@@ -993,6 +1063,8 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                     }
                   : m,
               );
+              if (liveChatId) snapshotThread(liveChatId, title, next);
+              return next;
             });
             setAttachments([]);
             if (liveChatId) {

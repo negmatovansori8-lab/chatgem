@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ChatRecord, MessageRecord } from "@/types/chat";
 import type { MapContext } from "@/lib/maps/context";
+import { mergeChats, recallChats, rememberChats } from "@/features/chat/chat-memory";
 import { requestJson } from "@/lib/http";
 
 export type ChatModelOption = {
@@ -21,27 +22,50 @@ function fetchChats(query: string) {
   return requestJson<{ chats?: ChatRecord[] }>(`/api/chats?${params.toString()}`, fetchOpts);
 }
 
+function withLocalMemory(server: ChatRecord[], query: string) {
+  const local = query ? [] : recallChats();
+  const merged = query ? server : mergeChats(server, local);
+  if (!query) rememberChats(merged);
+  return merged;
+}
+
 export function useChatList(query = "") {
-  const [chats, setChats] = useState<ChatRecord[]>([]);
+  const [chats, setChatsState] = useState<ChatRecord[]>([]);
   // Offline / server errors keep the last list instead of throwing.
   const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
+
+  const setChats = useCallback((value: ChatRecord[] | ((prev: ChatRecord[]) => ChatRecord[])) => {
+    setChatsState((prev) => {
+      const next = typeof value === "function" ? value(prev) : value;
+      if (!query) rememberChats(next);
+      return next;
+    });
+  }, [query]);
 
   const refresh = useCallback(
     () =>
       fetchChats(query)
-        .then((data) => setChats(data.chats ?? []))
-        .catch(() => {})
+        .then((data) => setChatsState(withLocalMemory(data.chats ?? [], query)))
+        .catch(() => {
+          if (!query) setChatsState(recallChats());
+        })
         .finally(() => setLoadedQuery(query)),
     [query],
   );
 
   useEffect(() => {
     let cancelled = false;
+    if (!query) {
+      const local = recallChats();
+      if (local.length) setChatsState(local);
+    }
     fetchChats(query)
       .then((data) => {
-        if (!cancelled) setChats(data.chats ?? []);
+        if (!cancelled) setChatsState(withLocalMemory(data.chats ?? [], query));
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled && !query) setChatsState(recallChats());
+      })
       .finally(() => {
         if (!cancelled) setLoadedQuery(query);
       });
