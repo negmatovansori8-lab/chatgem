@@ -76,7 +76,7 @@ describe("SpeechDetector", () => {
     const start = run(d, 0.08, 1000, 2000);
     expect(start).toHaveLength(1);
     expect(start[0]).toMatch(/^speech-start/);
-    const end = run(d, 0.003, 2000, 3500);
+    const end = run(d, 0.003, 2000, 4500);
     expect(end).toHaveLength(1);
     expect(end[0]).toMatch(/^speech-end/);
   });

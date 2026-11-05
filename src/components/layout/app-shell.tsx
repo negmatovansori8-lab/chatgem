@@ -14,6 +14,7 @@ import {
   ImageIcon,
   Map,
   MessageSquarePlus,
+  Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
@@ -135,8 +136,8 @@ function DrawerContent({
           onClick={() => go("/app/chat", { keepSidebarOnDesktop: true })}
           className="brand-hover flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-md)] py-0.5 text-start transition hover:opacity-90"
         >
-          <BrandMark size="sm" />
-          <BrandWordmark className="text-[17px]" />
+          <BrandMark size="sm" className="shrink-0" />
+          <BrandWordmark className="min-w-0 truncate text-[17px]" />
         </button>
         {/* Mobile: exit sidebar with same ChatGPT-style icon */}
         <button
@@ -166,6 +167,7 @@ function DrawerContent({
       <nav className="space-y-0.5 px-2.5 pb-2">
         {(
           [
+            { href: "/app/billing", labelKey: "sidebar.pro", icon: Sparkles },
             { href: "/app/gallery", labelKey: "sidebar.images", icon: ImageIcon },
             { href: "/app/files", labelKey: "sidebar.files", icon: FolderOpen },
             { href: "/app/knowledge", labelKey: "sidebar.library", icon: BookOpen },

@@ -1106,7 +1106,7 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                 sidebarOpen && "max-lg:hidden",
               )}
             >
-              {!sidebarOpen ? <BrandMark size="xs" /> : null}
+              {!sidebarOpen ? <BrandMark size="xs" className="shrink-0" /> : null}
               <BrandWordmark className="min-w-0 truncate text-[15px]" />
             </div>
           )}

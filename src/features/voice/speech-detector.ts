@@ -17,8 +17,10 @@ export type DetectorConfig = {
   endSilenceMs: number;
 };
 
-export const NORMAL_DETECTOR: DetectorConfig = { minRms: 0.012, ratio: 2.8, startMs: 140, endSilenceMs: 950 };
-export const STRICT_DETECTOR: DetectorConfig = { minRms: 0.04, ratio: 5, startMs: 260, endSilenceMs: 950 };
+/** Quiet must last this long before the person is treated as finished. A breath or a pause mid-sentence is not the end. */
+const END_SILENCE_MS = 2000;
+export const NORMAL_DETECTOR: DetectorConfig = { minRms: 0.012, ratio: 2.8, startMs: 140, endSilenceMs: END_SILENCE_MS };
+export const STRICT_DETECTOR: DetectorConfig = { minRms: 0.04, ratio: 5, startMs: 260, endSilenceMs: END_SILENCE_MS };
 
 const CALIBRATE_MS = 400;
 /** A "voice" this steady for this long is a fan / engine hum, not a person. */
