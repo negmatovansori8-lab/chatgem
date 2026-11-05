@@ -20,12 +20,12 @@ export function MarketingNavbar() {
     <header className="sticky top-0 z-50 border-b border-white/8 bg-[#05070c]/75 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
         <div className="min-w-0 shrink">
-          <Logo href="/" size="sm" showWordmark />
+          <Logo href="/app/chat" size="sm" showWordmark />
         </div>
 
         <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
           <Link
-            href="/#pricing"
+            href="/welcome#pricing"
             className="rounded-full px-2.5 py-2 text-[12px] font-semibold text-white/80 transition hover:bg-white/10 hover:text-white sm:px-3 sm:text-[13px]"
           >
             {t("sidebar.pro")}

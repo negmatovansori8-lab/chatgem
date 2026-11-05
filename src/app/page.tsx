@@ -1,5 +1,6 @@
-import { LandingPage } from "@/features/marketing/landing-page";
+import { redirect } from "next/navigation";
 
+/** Typing the site name opens the app, not the introduction page. */
 export default function HomePage() {
-  return <LandingPage />;
+  redirect("/app/chat");
 }

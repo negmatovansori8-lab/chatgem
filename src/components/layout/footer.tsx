@@ -12,13 +12,13 @@ export function Footer() {
     <footer className="border-t border-white/8 bg-[#03050a]">
       <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-14 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="max-w-sm">
-          <Logo showWordmark />
+          <Logo href="/app/chat" showWordmark />
           <p className="mt-3 text-sm leading-relaxed text-white/40">
             {t("landing.footer.tagline")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/45">
-          <Link href="/#pricing" className="transition hover:text-white">
+          <Link href="/welcome#pricing" className="transition hover:text-white">
             {t("nav.pricing")}
           </Link>
           <Link href="/app/billing" className="transition hover:text-white">
