@@ -44,7 +44,6 @@ const KEEP_LOCAL = [
   "nj_locale",
   "nj_locale_v3",
   "nj_locale_v4",
-  "nj_welcome_seen_v2",
   "nj_sidebar_open",
   "theme",
   ACCENT_STORAGE_KEY,

@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { BrandMark } from "@/components/brand/brand-mark";
-import { brand } from "@/config/site";
+import { BrandMark, BrandWordmark } from "@/components/brand/brand-mark";
 import { useI18n } from "@/components/i18n/locale-provider";
 
-/** Hero: the ChatGem globe logo (it already carries the name) over a blue glow, then the CTAs. */
+/** Hero: the gem mark, the wordmark, then the CTAs. */
 export function HeroSection() {
   const { t } = useI18n();
 
@@ -35,7 +34,7 @@ export function HeroSection() {
       </div>
 
       <div className="relative mx-auto flex min-h-[min(100dvh,900px)] max-w-5xl flex-col items-center justify-center px-4 pb-20 pt-28 text-center sm:px-6 sm:pb-24 sm:pt-32">
-        <div className="nj-hero-float relative mx-auto grid aspect-square w-[min(76vw,340px)] place-items-center">
+        <div className="nj-hero-float relative mx-auto grid aspect-square w-[min(42vw,168px)] place-items-center">
           <div
             className="absolute inset-[-14%] rounded-full opacity-80"
             style={{
@@ -45,10 +44,12 @@ export function HeroSection() {
             }}
             aria-hidden
           />
-          <BrandMark animate="intro" priority className="relative h-full w-full shadow-[0_24px_64px_-12px_rgba(37,99,235,0.55)]" />
+          <BrandMark animate="intro" className="relative h-full w-full shadow-[0_24px_64px_-12px_rgba(37,99,235,0.55)]" />
         </div>
 
-        <h1 className="sr-only">{brand.name}</h1>
+        <h1 className="nj-hero-rise mt-7 text-[clamp(2.6rem,8vw,4rem)] [--fg:#fafafa] [--landing-fg:#fafafa]">
+          <BrandWordmark />
+        </h1>
 
         <p className="nj-hero-rise mt-8 max-w-md font-[family-name:var(--font-display)] text-[clamp(1.15rem,3.2vw,1.45rem)] font-semibold tracking-tight text-white/95">
           {t("hero.subtitle")}

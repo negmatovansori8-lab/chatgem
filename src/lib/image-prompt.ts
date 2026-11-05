@@ -87,7 +87,7 @@ const LEADING_DESIGN_NOUN_RE = new RegExp(
   "iu",
 );
 const QUESTION_OR_PROBLEM_RE = new RegExp(
-  String.raw`\?|${EDGE}(?:чӣ|чи|чаро|кадом|чист|куҷо|кучо|чӣ\s+тавр|савол\p{L}*|пурсам|пурсед|бидон\p{L}*|фаҳмон\p{L}*|ҷавоб\p{L}*|что|как|почему|зачем|где|какой|what|why|how|where|which|нест|намоён|намешавад|намекунад|не\s+работ\p{L}*|не\s+показ\p{L}*|not\s+work\p{L}*|broken|хато|ошибк\p{L}*|error)${END}`,
+  String.raw`\?|${EDGE}(?:чӣ|чи|чаро|кадом|чист|куҷо|кучо|чӣ\s+тавр|савол\p{L}*|пурсам|пурсед|бидон\p{L}*|фаҳмон\p{L}*|ҷавоб\p{L}*|пойтахт\p{L}*|столиц\p{L}*|capital|что|как|почему|зачем|где|какой|what|why|how|where|which|нест|намоён|намешавад|намекунад|не\s+работ\p{L}*|не\s+показ\p{L}*|not\s+work\p{L}*|broken|хато|ошибк\p{L}*|error)${END}`,
   "iu",
 );
 
@@ -131,13 +131,11 @@ export function isLogoRequest(text: string) {
 export const DEFAULT_CHATGEM_LOGO_SUBJECT = "ChatGem";
 
 export const DEFAULT_CHATGEM_LOGO_PROMPT = [
-  "ChatGem AI brand logo",
-  "luminous gem crystal fused with Earth globe",
-  "modern world-class tech identity mark",
-  "flat vector, centered, deep navy background",
-  "electric blue and teal glow, premium clean",
-  "optional tiny ChatGem wordmark only",
-  "no photo mockup, no phone, no watermark, no random letters",
+  "ChatGem brand mark",
+  "one flat geometric gem, two solid blues, a small white facet",
+  "centered on a plain near-black circle",
+  "vector, crisp edges, generous negative space",
+  "no globe photo, no camera, no laptop, no landscape cards, no 3D plastic, no extra icons, no letters, no watermark",
 ].join(", ");
 
 export function resolveLogoSubject(subject: string): string {

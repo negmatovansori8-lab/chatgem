@@ -57,6 +57,8 @@ export function encyclopediaSubject(text: string): string | null {
   const words = subject.split(" ");
   const named = /^\p{Lu}/u.test(subject) && subject !== subject.toUpperCase();
   if (words.length > 5 || words.some((w) => PRONOUNS.has(w.toLowerCase()))) return null;
+  // «Пойтахти чопон чист» asks for a city, not a definition of an unknown machine part.
+  if (/^(?:пойтахт|столиц)/iu.test(subject) || /^capital(?:\s|$)/iu.test(subject)) return null;
   return named ? subject : null;
 }
 

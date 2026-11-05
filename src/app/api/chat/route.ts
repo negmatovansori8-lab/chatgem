@@ -23,6 +23,7 @@ import { voiceLanguage } from "@/lib/voice/languages";
 import { detectMediaIntent } from "@/lib/media/intent";
 import { isStrongMatch } from "@/lib/media/rank";
 import { detectSocialDownload, socialDownloadMarkdown } from "@/lib/media/social-download";
+import { capitalAnswer } from "@/lib/assistant/capitals";
 import { encyclopediaBlock, encyclopediaSubject, lookupEncyclopedia } from "@/lib/assistant/encyclopedia";
 import {
   mediaAskMarkdown,
@@ -253,6 +254,7 @@ function groundedFacts() {
   return [
     "FACT ANCHOR (when relevant):",
     "- Tajikistan capital: Душанбе. Currency: сомонӣ (TJS). Language: тоҷикӣ.",
+    "- Ҷопон / чопон / Япония / Japan is the country Japan. Its capital is Токио. It is not a printer part.",
     "- «Исмоили Сомонӣ» (849–907) is a person: amir of Bukhara and founder of the Samanid state; the currency is named after him. A question about him is about the person, not the money.",
     "- You are ChatGem.",
   ].join("\n");
@@ -263,7 +265,7 @@ function mediaCapabilityRules() {
   return [
     "MEDIA & VISION (mandatory when relevant):",
     "- Guests and signed-in users get full helpful answers — no account required to chat.",
-    "- IMAGE GENERATION: Only when the user clearly asks YOU to create a picture NOW (сурат соз, тасвир соз, акс соз, логотип/логатип соз, нарисуй, create an image, «ба ман мошин соз»). For logo requests: GENERATE a world-class ChatGem logo — do NOT answer with text tips. Bare «СОЗ» after logo intent = create the logo. Do NOT generate when they ask for a prompt or a question (промт диҳ, барои Cursor). Do NOT invent random letters like C03.",
+    "- IMAGE GENERATION: Only when the user clearly asks YOU to create a picture NOW (сурат соз, тасвир соз, акс соз, логотип/логатип соз, нарисуй, create an image, «ба ман мошин соз»). For logo requests: GENERATE a world-class ChatGem logo — do NOT answer with text tips. Bare «СОЗ» after logo intent = create the logo. Do NOT generate when they ask for a prompt or a question (промт диҳ, барои Cursor, пойтахт, чист, what is). Never paste an image URL or markdown image. Do NOT invent random letters like C03.",
     "- When images OR video frames are attached: LOOK carefully. Read on-screen text (OCR), logos, actors, posters, UI chrome (Netflix, YouTube, TikTok, Telegram).",
     "- MOVIE / SERIES / CLIP ID (highest priority when media looks like entertainment):",
     "  1) First line: official title in original language + common local title if known (e.g. English + Russian).",
@@ -736,6 +738,18 @@ export async function POST(request: Request) {
         ),
       );
 
+      const fact = !correction ? capitalAnswer(userContent) : null;
+      if (fact) {
+        assistantText = fact;
+        usedModel = "facts";
+        await chatRepository.addMessage(userId, chatId!, { role: "ASSISTANT", content: fact, modelId: "facts" });
+        controller.enqueue(encoder.encode(encodeSse({ type: "replace", content: fact, chatId })));
+        controller.enqueue(encoder.encode(encodeSse({ type: "meta", chatId, modelId: "facts", intent: "answer" })));
+        controller.enqueue(encoder.encode(encodeSse({ type: "done", chatId })));
+        controller.close();
+        return;
+      }
+
       const socialDownload = !voiceTurn && !correction ? detectSocialDownload(userContent) : null;
       if (socialDownload) {
         const reply = socialDownloadMarkdown(socialDownload, answerLocale);
@@ -1018,8 +1032,13 @@ export async function POST(request: Request) {
         return;
       }
 
-      let finalText = result.text.trim();
-      let replaced = false;
+      const rawReply = result.text.trim();
+      let finalText = rawReply
+        .replace(/!\[[^\]]*]\([^)]*\)/g, "")
+        .replace(/https?:\/\/(?:image|gen)\.pollinations\.ai\/\S+/gi, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+      let replaced = finalText !== rawReply;
       if (!finalText || isEmptyAck(finalText) || isLazyFluff(finalText, userContent)) {
         result = await runOnce(
           `${promptForModel}\n\nCRITICAL REWRITE: Previous draft was lazy or off-topic (e.g. only said your name). Answer like strong ChatGPT: correct meaning of the user's question, direct answer first, then clear explanation + examples. Write it in ${replyLanguageLabel(answerLocale)}. No empty «ask me anything» closer without teaching.`,

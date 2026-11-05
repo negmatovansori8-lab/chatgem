@@ -37,6 +37,8 @@ describe("wantsImageGeneration", () => {
     expect(wantsImageGeneration("Ман мехоҳам бидонам логотип чист")).toBe(false);
     expect(wantsImageGeneration("Логотипи Тоҷикистон чӣ маъно дорад?")).toBe(false);
     expect(wantsImageGeneration("чаро осмон кабуд аст")).toBe(false);
+    expect(wantsImageGeneration("Пойтахти чопон чист")).toBe(false);
+    expect(wantsImageGeneration("Пойтахти чопон")).toBe(false);
   });
 });
 

@@ -5,7 +5,6 @@ import { LocaleProvider } from "@/components/i18n/locale-provider";
 import { DeviceSync } from "@/components/system/device-sync";
 import { NetworkStatus } from "@/components/system/network-status";
 import { ToastProvider } from "@/components/ui/toast";
-import { WelcomeGate } from "@/components/welcome-gate";
 import { brand } from "@/config/site";
 import { BOOT_SCRIPT } from "@/lib/boot-script";
 import "./globals.css";
@@ -80,7 +79,7 @@ export default function RootLayout({
         <ThemeProvider>
           <LocaleProvider>
             <ToastProvider>
-              <WelcomeGate>{children}</WelcomeGate>
+              {children}
               <NetworkStatus />
             </ToastProvider>
           </LocaleProvider>

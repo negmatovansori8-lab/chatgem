@@ -460,9 +460,10 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                     ? ""
                     : JSON.stringify(m.content);
               const imgMatch = raw.match(/!\[[^\]]*]\(((?:https?:\/\/|\/)[^)\s]+)\)/);
-              const imageUrl = imgMatch?.[1];
-              const content = imageUrl
-                ? raw.replace(/!\[[^\]]*]\(((?:https?:\/\/|\/)[^)\s]+)\)\s*/g, "").trim()
+              const junkImage = Boolean(imgMatch?.[1] && /pollinations\.ai/i.test(imgMatch[1]));
+              const imageUrl = junkImage ? undefined : imgMatch?.[1];
+              const content = imgMatch
+                ? raw.replace(/!\[[^\]]*]\(((?:https?:\/\/|\/)[^)\s]+)\)\s*/g, "").replace(/https?:\/\/(?:image|gen)\.pollinations\.ai\/\S+/gi, "").trim()
                 : raw;
               return {
                 id: m.id,
@@ -666,6 +667,8 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
             ? "Хизматрасонии тасвирсозӣ ҳоло банд аст (лимити дархостҳо). 20–30 сония сабр кунед ва «Аз нав»-ро пахш кунед."
             : /Prompt translation failed/i.test(raw)
             ? "Тасвир сохта нашуд: дархости шуморо ба забони англисӣ тарҷума карда натавонистем (калидҳои AI ҷавоб надоданд), бинобар ин тасвири нодуруст насохтем. Баъдтар «Аз нав»-ро пахш кунед."
+            : /Professional logo model|world-class logo/i.test(raw)
+            ? "Логотип дар сатҳи ҷаҳонӣ бо модели ройгон сохта намешавад: он обнавӣ ва ҳарфҳои вайрон мегузорад. OpenAI тасвирро рад кард. Дар platform.openai.com моделҳои GPT Image ва DALL·E-ро фаъол кунед ва биллингро санҷед."
             : /POLLINATIONS_API_KEY|No image provider/i.test(raw)
             ? "Тасвир сохта нашуд: OpenAI маблағ надорад ва барои Pollinations калид лозим аст. Калиди ройгонро дар enter.pollinations.ai/keys гиред ва дар .env ҳамчун POLLINATIONS_API_KEY гузоред."
             : /unknown parameter|style|pollinations|quota|billing|api.?key/i.test(raw)
@@ -1009,13 +1012,14 @@ export function ChatWorkspace({ chatId }: { chatId?: string }) {
                       ).map((m) => {
                         const raw = chatMap.contentFor(m.id, m.content);
                         const imgMatch = raw.match(/!\[[^\]]*]\(((?:https?:\/\/|\/)[^)\s]+)\)/);
+                        const junkImage = Boolean(imgMatch?.[1] && /pollinations\.ai/i.test(imgMatch[1]));
                         return {
                           id: m.id,
                           role: m.role === "USER" ? "user" : "assistant",
                           content: imgMatch
-                            ? raw.replace(/!\[[^\]]*]\(((?:https?:\/\/|\/)[^)\s]+)\)\s*/g, "").trim()
+                            ? raw.replace(/!\[[^\]]*]\(((?:https?:\/\/|\/)[^)\s]+)\)\s*/g, "").replace(/https?:\/\/(?:image|gen)\.pollinations\.ai\/\S+/gi, "").trim()
                             : raw,
-                          imageUrl: imgMatch?.[1],
+                          imageUrl: junkImage ? undefined : imgMatch?.[1],
                         };
                       });
                       if (lastImageUrl) {
