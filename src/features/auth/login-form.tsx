@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { BrandMark, BrandWordmark } from "@/components/brand/brand-mark";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { OAuthButtons } from "@/features/auth/oauth-buttons";
 
 export function LoginForm() {
@@ -44,9 +45,10 @@ export function LoginForm() {
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-x-hidden bg-[#050505] text-white">
-      <div className="absolute end-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 sm:end-4">
+    <div className="relative flex min-h-dvh flex-col overflow-x-hidden bg-[var(--bg)] text-[var(--fg)]">
+      <div className="absolute end-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 flex items-center gap-1 sm:end-4">
         <LanguageSwitcher compact />
+        <ThemeToggle />
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-10 sm:px-5">
@@ -54,26 +56,26 @@ export function LoginForm() {
           <Link href="/" className="brand-hover block rounded-[22.5%]" aria-label="ChatGem">
             <BrandMark size="xl" tile="dark" animate="intro" />
           </Link>
-          <h1 className="mt-5 text-3xl [--fg:#fafafa]">
+          <h1 className="mt-5 text-3xl">
             <BrandWordmark />
           </h1>
-          <p className="mt-1 text-sm text-white/50">AI</p>
-          <p className="mt-3 text-center text-sm text-white/45">{t("auth.login.subtitle")}</p>
+          <p className="mt-1 text-sm text-[var(--fg-muted)]">AI</p>
+          <p className="mt-3 text-center text-sm text-[var(--fg-muted)]">{t("auth.login.subtitle")}</p>
 
           <div className="mt-6 w-full space-y-4">
             <OAuthButtons mode="login" />
 
             <div className="flex items-center gap-3 px-1">
-              <span className="h-px flex-1 bg-white/15" />
-              <span className="text-[11px] font-medium uppercase tracking-wider text-white/40">
+              <span className="h-px flex-1 bg-[var(--border)]" />
+              <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--fg-subtle)]">
                 {t("auth.orEmail")}
               </span>
-              <span className="h-px flex-1 bg-white/15" />
+              <span className="h-px flex-1 bg-[var(--border)]" />
             </div>
 
             <form
               onSubmit={onSubmit}
-              className="space-y-3 rounded-[1.5rem] border border-white/8 bg-[#121214] p-5"
+              className="space-y-3 rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] p-5"
             >
               <div className="space-y-2">
                 <Label htmlFor="email">{t("auth.email")}</Label>
@@ -83,7 +85,7 @@ export function LoginForm() {
                   type="email"
                   required
                   autoComplete="email"
-                  className="rounded-full border-white/10 bg-black"
+                  className="rounded-full border-[var(--border)] bg-[var(--surface-2)]"
                 />
               </div>
               <div className="space-y-2">
@@ -94,13 +96,13 @@ export function LoginForm() {
                   minLength={8}
                   required
                   autoComplete="current-password"
-                  className="rounded-full border-white/10 bg-black"
+                  className="rounded-full border-[var(--border)] bg-[var(--surface-2)]"
                 />
               </div>
               <button
                 type="submit"
                 disabled={pending}
-                className="w-full rounded-full bg-white py-3 text-sm font-semibold text-black disabled:opacity-60"
+                className="w-full rounded-full bg-[var(--pill)] py-3 text-sm font-semibold text-[var(--pill-fg)] disabled:opacity-60"
               >
                 {pending ? t("common.loading") : t("auth.login.cta")}
               </button>
@@ -108,7 +110,7 @@ export function LoginForm() {
 
             {notice ? (
               <p
-                className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-100"
+                className="rounded-2xl border border-[var(--danger)]/30 bg-[var(--danger-muted)] px-4 py-3 text-xs text-[var(--danger)]"
                 role="status"
               >
                 {notice}

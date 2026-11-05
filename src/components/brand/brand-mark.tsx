@@ -3,22 +3,6 @@
 import { cn } from "@/lib/utils";
 import styles from "./brand-mark.module.css";
 
-/** Flat gem mark. One shape, two blues, no photos and no extra icons. */
-function MarkGlyph() {
-  return (
-    <svg viewBox="0 0 64 64" className={styles.glyph} aria-hidden>
-      <circle cx="32" cy="32" r="32" fill="#050814" />
-      <path d="M32 14 47 26 32 30 17 26Z" fill="#7DD3FC" />
-      <path d="M32 14 47 26 32 30Z" fill="#BFDBFE" />
-      <path d="M47 26 42 35 32 30Z" fill="#2563EB" />
-      <path d="M17 26 22 35 32 30Z" fill="#1D4ED8" />
-      <path d="M42 35 32 51 32 30Z" fill="#1E3A8A" />
-      <path d="M22 35 32 51 32 30Z" fill="#172554" />
-      <path d="M32 14 36.5 19.5 32 22.5 27.5 19.5Z" fill="#FFFFFF" />
-    </svg>
-  );
-}
-
 export type BrandMarkSize = "xs" | "sm" | "md" | "lg" | "xl";
 
 const BOX: Record<BrandMarkSize, string> = {
@@ -30,7 +14,7 @@ const BOX: Record<BrandMarkSize, string> = {
 };
 
 /**
- * ChatGem mark: a flat gem on a dark disc.
+ * ChatGem mark from the official artwork (`/chatgem-logo.png`).
  * `tile` adds the glow used on hero surfaces; `animate` adds the intro or the loading pulse.
  */
 export function BrandMark({
@@ -61,7 +45,7 @@ export function BrandMark({
       aria-label={title}
       aria-hidden={title ? undefined : true}
     >
-      <MarkGlyph />
+      <img src="/chatgem-logo.png" alt="" draggable={false} className={styles.glyph} />
     </span>
   );
 }

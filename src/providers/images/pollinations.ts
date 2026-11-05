@@ -24,7 +24,12 @@ export function fluxFriendlyPrompt(prompt: string): string {
   // Logos must stay flat graphics — "photorealistic" turns them into photos of people,
   // and Flux scribbles fake lettering unless told the mark is wordless.
   if (/\blogo\b|emblem/i.test(cleaned)) {
-    return `${LOGO_LEAD}${core.slice(0, 150)}, simple bold geometric shapes, symmetrical, few solid colors, centered on plain white background, wordless, no text, no letters`;
+    const named = cleaned.match(/["“”«»]([^"“”«»]{1,40})["“”«»]/);
+    const name = named?.[1]?.trim();
+    const lettering = name
+      ? `the only text is "${name}" spelled exactly once`
+      : "wordless symbol, no text, no letters";
+    return `${LOGO_LEAD}${core.slice(0, 140)}, simple bold geometric shapes, symmetrical, few solid colors, centered on a plain background, ${lettering}`;
   }
   return `${core}, photorealistic, sharp detail, correct subject only`.slice(0, 280);
 }

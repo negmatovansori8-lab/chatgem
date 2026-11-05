@@ -10,19 +10,7 @@ const root = path.resolve(import.meta.dirname, "..");
 const out = (...parts) => path.join(root, ...parts);
 const SOURCE = out("public", "brand", "chatgem-logo-source.png");
 
-/** The artwork is a disc on a dark square — keep only the disc, transparent outside it. */
-async function disc(size) {
-  const mask = Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}"/></svg>`,
-  );
-  return sharp(SOURCE)
-    .resize(size, size)
-    .composite([{ input: mask, blend: "dest-in" }])
-    .png({ compressionLevel: 9 })
-    .toBuffer();
-}
-
-/** Full square artwork (iOS / Android apply their own mask). */
+/** Full square artwork. The mark is a rounded tile with the wordmark, so a circle crop would cut «ChatGem». */
 async function square(size, scale = 1) {
   const inner = Math.round(size * scale);
   const { data } = await sharp(SOURCE).extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer({ resolveWithObject: true });
@@ -59,16 +47,16 @@ function ico(frames) {
 async function main() {
   await mkdir(out("public", "icons"), { recursive: true });
 
-  await writeFile(out("public", "chatgem-logo.png"), await disc(512));
-  await writeFile(out("src", "app", "icon.png"), await disc(192));
+  await writeFile(out("public", "chatgem-logo.png"), await square(512));
+  await writeFile(out("src", "app", "icon.png"), await square(192));
   await writeFile(
     out("src", "app", "favicon.ico"),
-    ico(await Promise.all([16, 32, 48].map(async (size) => ({ size, data: await disc(size) })))),
+    ico(await Promise.all([16, 32, 48].map(async (size) => ({ size, data: await square(size) })))),
   );
   await writeFile(out("src", "app", "apple-icon.png"), await square(180));
   await writeFile(out("public", "icons", "icon-192.png"), await square(192));
   await writeFile(out("public", "icons", "icon-512.png"), await square(512));
-  // Android crops maskable icons to a circle — keep the disc inside the 80% safe zone.
+  // Android crops maskable icons to a circle — keep the tile inside the safe zone.
   await writeFile(out("public", "icons", "maskable-512.png"), await square(512, 0.8));
 
   console.log("Brand assets written.");

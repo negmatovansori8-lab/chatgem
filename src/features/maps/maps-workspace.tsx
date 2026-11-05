@@ -1213,8 +1213,9 @@ export function MapsWorkspace({
       : effectiveLayer === "dark" && status.dark
         ? status.dark
         : status.tiles;
-  /** No dedicated dark basemap configured → darken the standard tiles in CSS. */
-  const dimTiles = effectiveLayer === "dark" && !status.dark;
+  // Inverting OSM tiles swaps land, water and labels, so the map looks wrong.
+  // Without a real dark basemap, keep the true-color tiles.
+  const dimTiles = false;
   // Tiles load as plain (no-CORS) images, so the warm connection must not be CORS.
   for (const origin of tileOrigins(tiles)) preconnect(origin);
 

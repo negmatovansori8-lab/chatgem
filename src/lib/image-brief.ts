@@ -164,8 +164,8 @@ const KIND_SPECS: Record<BriefKind, KindSpec> = {
     composition: "one centered emblem on a plain solid background, strong silhouette, generous negative space, balanced geometry that still reads at favicon size",
     colors: "a tight palette of two to four solid colours",
     quality: "crisp vector edges, scalable, works as an app icon, on a website and as a favicon",
-    avoid: ["photo", "mockup", "busy details", "gradient noise", "multiple logos", "clip art", "watermark"],
-    flux: "minimalist flat vector logo, sharp clean edges, centered on a plain white background, professional brand identity",
+    avoid: ["photo", "mockup", "busy details", "gradient noise", "multiple logos", "clip art", "watermark", "random people", "misspelled text", "3D plastic"],
+    flux: "minimalist flat vector logo, sharp clean edges, centered on a plain background, exact brand name only if one was given",
   },
   icon: {
     lead: "App icon design",

@@ -63,17 +63,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="tg"
-      suppressHydrationWarning
-      className="h-full"
-      data-scroll-behavior="smooth"
-    >
+    <html lang="tg" suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
         <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
       </head>
       <body
-        className={`${body.variable} ${display.variable} ${mono.variable} min-h-full antialiased`}
+        className={`${body.variable} ${display.variable} ${mono.variable} h-full min-h-full antialiased`}
       >
         <DeviceSync />
         <ThemeProvider>

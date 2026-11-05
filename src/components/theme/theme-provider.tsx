@@ -13,6 +13,7 @@ export function ThemeProvider({
       defaultTheme="dark"
       enableSystem
       disableTransitionOnChange
+      themes={["light", "dark"]}
       {...props}
     >
       {children}

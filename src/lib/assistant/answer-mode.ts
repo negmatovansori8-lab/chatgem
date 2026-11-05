@@ -291,9 +291,12 @@ const MODE_BLOCKS: Record<Exclude<AnswerMode, "prompt" | "build">, string> = {
     "Numbered steps; each step has the exact command, code or setting. Mention OS differences only if relevant. End with «how to verify» and the 2–3 most common errors with fixes.",
   ].join("\n"),
   simple: [
-    "ANSWER MODE — GENERAL QUESTION: match the depth to the question.",
-    "- Simple fact / short question → direct answer first, 1–4 clear sentences, no headings.",
-    "- «Explain / фаҳмон / шарҳ деҳ / объясни / what is X» → short definition first, then a structured mini-lesson (key points + one example).",
+    "ANSWER MODE — GENERAL QUESTION: correct and complete, not a slogan.",
+    "- First sentence is the direct answer.",
+    "- Then give the facts a careful reader needs: the definition or result, the important details, and one concrete example.",
+    "- A one-line brush-off is a failure unless the user asked for a single word or a number.",
+    "- Never invent names, dates, statistics, places or citations. If one detail is uncertain, say so in a clause and still answer the rest.",
+    "- «Explain / фаҳмон / шарҳ деҳ / объясни / what is X» → definition first, then a short structured explanation (key points + one example).",
   ].join("\n"),
 };
 

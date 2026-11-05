@@ -587,7 +587,7 @@ code {
 .cg-map .leaflet-container {
   font-family: var(--font-body), system-ui, sans-serif;
   /* Basemap land colour, so tiles still loading don't show as grey holes. */
-  background: #f2efe9;
+  background: var(--surface-2);
 }
 .cg-map .leaflet-control-attribution {
   font-size: 10px;
@@ -846,12 +846,6 @@ code {
 }
 .cg-map .leaflet-control-attribution {
   margin-bottom: var(--sheet-h, 0px) !important;
-}
-.cg-map--dim .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.55);
-}
-.cg-map--dim .leaflet-container {
-  background: #1b1f24;
 }
 @keyframes cg-skeleton {
   0% {

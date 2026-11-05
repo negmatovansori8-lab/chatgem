@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createLocalUser,
-  getSessionUser,
-  setSessionUser,
-} from "@/server/auth/session";
+import { userRepository } from "@/repositories/user-repository";
+import { getSessionUser, setSessionUser } from "@/server/auth/session";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -28,22 +25,28 @@ export async function POST(request: Request) {
     );
   }
 
-  // Local credentials session for product UX.
-  // Password is accepted but not persisted until a real auth DB is wired.
-  const user = createLocalUser({
-    email: parsed.data.email,
-    name: parsed.data.name,
-    provider: "credentials",
-  });
-  await setSessionUser(user);
-
-  return NextResponse.json({
-    user,
-    notice:
+  try {
+    const user =
       parsed.data.mode === "register"
-        ? "Account session created locally. Connect PostgreSQL + email verification for production auth."
-        : "Signed in locally. OAuth providers activate when client IDs are configured.",
-  });
+        ? await userRepository.register({
+            email: parsed.data.email,
+            password: parsed.data.password,
+            name: parsed.data.name,
+          })
+        : await userRepository.login({
+            email: parsed.data.email,
+            password: parsed.data.password,
+          });
+    await setSessionUser(user);
+    return NextResponse.json({ user });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Sign-in failed";
+    const taken = /аллакай/i.test(message);
+    return NextResponse.json(
+      { error: { code: taken ? "CONFLICT" : "AUTH_ERROR", message } },
+      { status: taken ? 409 : 401 },
+    );
+  }
 }
 
 export async function PATCH(request: Request) {

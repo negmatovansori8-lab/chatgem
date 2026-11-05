@@ -167,6 +167,11 @@ function isTooShortStub(reply: string, userPrompt: string) {
   if (/^\s*[\d\wа-яёғӣқӯҳҷА-ЯЁҒӢҚӮҲҶ\-–.,\s]{2,40}\s*$/i.test(t) && !/chatgem/i.test(t)) {
     return false;
   }
+  const wantsDepth =
+    /фаҳмон|шарҳ|объясни|explain|чаро|почему|(?<![\p{L}])why(?![\p{L}])|чӣ\s*тавр|чи\s*тавр|(?<![\p{L}])how(?![\p{L}])/iu.test(
+      userPrompt,
+    );
+  if (wantsDepth && t.length < 280) return true;
   return t.length < 40;
 }
 
@@ -207,9 +212,10 @@ function coreAssistantRules(isPro: boolean) {
     "",
     "LENGTH:",
     "- Greetings and small talk («салом», «раҳмат», «чӣ хел?», «привет», «thanks») → reply like a friendly person in 1–2 short sentences (e.g. «Салом! Чӣ хизмат кунам?»). Never explain what the greeting word means.",
-    "- Simple yes-no / one-fact → 1–3 short sentences.",
+    "- Simple yes-no / one-fact → the fact in the first sentence, then one short reason so it can be checked.",
+    "- Explain / what / why / how → a complete answer: the correct definition or result, the key details, and one concrete example. A vague sentence is not an answer.",
     "- How-to / tutoring / analysis → structured detail with headings and lists.",
-    "- Never pad with filler; never invent current events without search context.",
+    "- Never pad with filler. Never invent names, dates, numbers, places or current events. If a detail is uncertain, say the best-established fact and mark what is uncertain.",
     "",
     "WORLD-CLASS ANSWER STRUCTURE:",
     "1) First sentence = direct answer.",
@@ -685,7 +691,7 @@ export async function POST(request: Request) {
   if (encyclopediaTopic) {
     const note = entry
       ? encyclopediaBlock(entry)
-      : `ENCYCLOPEDIA REFERENCE: none found for «${encyclopediaTopic}». Answer only from facts you are sure of (it may be a historical figure, a place or a known person under another spelling). If you do not reliably know this subject, say so in one or two sentences and ask the user to clarify. Never invent meanings, etymologies, tables or "possible interpretations".`;
+      : `ENCYCLOPEDIA REFERENCE: none found for «${encyclopediaTopic}». Still answer the question from knowledge you are sure of: direct answer first, then the explanation. If the name is ambiguous, give the most likely meaning and name one alternative. Do not invent biographies, dates, etymologies or statistics. Do not refuse with only «I do not know».`;
     webBlock = [webBlock, note].filter(Boolean).join("\n\n");
   }
 
