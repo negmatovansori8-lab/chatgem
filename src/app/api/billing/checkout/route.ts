@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestUserId } from "@/server/session";
-import { appUrl, getStripe, isStripeConfigured, planAmountCents } from "@/lib/stripe";
+import { getStripe, isStripeConfigured, planAmountCents } from "@/lib/stripe";
 import { createLemonCheckout, isLemonConfigured } from "@/lib/lemon-squeezy";
+import { resolveAppUrl } from "@/server/auth/app-url";
 import { PLANS } from "@/types/business";
 
 const bodySchema = z.object({
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
   }
 
   const { planId } = parsed.data;
+  const base = resolveAppUrl(request);
   const plan = PLANS.find((p) => p.id === planId);
   if (!plan) {
     return NextResponse.json(
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
 
   if (isLemonConfigured()) {
     try {
-      const checkout = await createLemonCheckout({ planId, userId });
+      const checkout = await createLemonCheckout({ planId, userId, baseUrl: base });
       return NextResponse.json({
         url: checkout.url,
         checkoutId: checkout.checkoutId,
@@ -79,7 +81,6 @@ export async function POST(request: Request) {
   }
 
   const amount = planAmountCents(planId);
-  const base = appUrl();
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",

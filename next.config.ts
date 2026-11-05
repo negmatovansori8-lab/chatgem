@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Phone on the same Wi-Fi opens the dev server by LAN address, not localhost.
+  allowedDevOrigins: ["127.0.0.1", "192.168.100.100"],
   reactStrictMode: true,
   poweredByHeader: false,
   // Hide the floating Next.js "N" Dev Tools badge in local preview

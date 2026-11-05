@@ -187,6 +187,17 @@ async function generateOneImage(opts: {
         : prompt,
     );
 
+  // Flux draws a plastic mockup, breaks the name, and stamps pollinations.ai on the picture.
+  // A world-class logo has to come from the professional image model, or not at all.
+  if (kind === "logo") {
+    return classifyFail(
+      openaiDetail
+        ? `Professional logo model refused the request. ${openaiDetail}`
+        : "A world-class logo needs the OpenAI image model. The free image fallback is disabled for logos.",
+      502,
+    );
+  }
+
   // Flux cannot read Tajik/Russian and draws a random woman instead of the subject.
   if ((fluxPrompt.match(/[\u0400-\u04FF]/g) || []).length > 2) {
     return classifyFail(

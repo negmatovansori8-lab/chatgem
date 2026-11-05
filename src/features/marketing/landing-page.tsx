@@ -3,6 +3,7 @@ import { HeroSection } from "@/components/landing/hero-section";
 import { ProductShowcase } from "@/components/landing/product-showcase";
 import { PlatformSection } from "@/components/landing/platform-section";
 import { FinalCtaSection } from "@/components/landing/final-cta";
+import { PricingSection } from "@/components/landing/pricing-section";
 import { MarketingNavbar } from "@/components/layout/marketing-navbar";
 import { Footer } from "@/components/layout/footer";
 
@@ -27,6 +28,7 @@ export function LandingPage() {
         <HeroSection />
         <ProductShowcase />
         <PlatformSection />
+        <PricingSection />
         <FinalCtaSection />
       </main>
       <Footer />

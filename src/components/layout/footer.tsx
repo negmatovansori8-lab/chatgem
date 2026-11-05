@@ -18,6 +18,12 @@ export function Footer() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/45">
+          <Link href="/#pricing" className="transition hover:text-white">
+            {t("nav.pricing")}
+          </Link>
+          <Link href="/app/billing" className="transition hover:text-white">
+            {t("billing.proGet")}
+          </Link>
           <Link href="/login" className="transition hover:text-white">
             {t("nav.signin")}
           </Link>

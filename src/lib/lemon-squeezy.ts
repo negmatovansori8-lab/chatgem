@@ -27,11 +27,12 @@ export async function createLemonCheckout(opts: {
   planId: Extract<PlanId, "pro" | "business">;
   userId: string;
   email?: string;
+  baseUrl?: string;
 }): Promise<{ url: string; checkoutId: string }> {
   const apiKey = process.env.LEMON_SQUEEZY_API_KEY!.trim();
   const storeId = process.env.LEMON_SQUEEZY_STORE_ID!.trim();
   const variantId = variantIdFor(opts.planId);
-  const base = appUrl();
+  const base = (opts.baseUrl || appUrl()).replace(/\/$/, "");
 
   const res = await fetch("https://api.lemonsqueezy.com/v1/checkouts", {
     method: "POST",

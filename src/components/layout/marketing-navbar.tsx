@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useI18n } from "@/components/i18n/locale-provider";
 import { Logo } from "@/components/brand/logo";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
@@ -11,9 +12,9 @@ const QUICK_LANGS = [
   { code: "en", label: "English", short: "EN" },
 ] as const;
 
-/** Landing header — languages only (login lives in the hero CTA). */
+/** Landing header — Pro link plus languages (login lives in the hero CTA). */
 export function MarketingNavbar() {
-  const { locale, setLocale } = useI18n();
+  const { t, locale, setLocale } = useI18n();
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/8 bg-[#05070c]/75 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
@@ -23,6 +24,12 @@ export function MarketingNavbar() {
         </div>
 
         <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <Link
+            href="/#pricing"
+            className="rounded-full px-2.5 py-2 text-[12px] font-semibold text-white/80 transition hover:bg-white/10 hover:text-white sm:px-3 sm:text-[13px]"
+          >
+            {t("sidebar.pro")}
+          </Link>
           <div className="flex items-center gap-0.5 rounded-full border border-white/12 bg-white/5 p-0.5 backdrop-blur-sm sm:gap-1 sm:p-1">
             {QUICK_LANGS.map((lang) => {
               const active = locale === lang.code || locale.startsWith(`${lang.code}-`);

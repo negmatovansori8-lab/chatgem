@@ -145,20 +145,18 @@ export function buildStrictEnglishPrompt(
   if (kind === "logo") {
     if (/^chatgem$/i.test(subject.trim())) {
       return [
-        "ChatGem AI brand logo",
-        "luminous gem crystal fused with Earth globe",
-        "modern world-class tech identity mark",
-        "flat vector, centered, deep navy background",
-        "electric blue and teal glow, premium clean",
-        "optional tiny ChatGem wordmark only",
-        "no photo mockup, no phone, no watermark, no random letters like C03",
+        "ChatGem brand mark",
+        "one flat geometric gem, two solid blues, a small white facet",
+        "centered on a plain near-black circle",
+        "vector, crisp edges, generous negative space",
+        "no globe photo, no camera, no laptop, no landscape cards, no 3D plastic, no extra icons, no letters, no watermark",
       ].join(", ");
     }
     return [
       `professional logo for ${subject}`,
-      "clean modern vector brand mark, centered, plain background",
-      "high contrast, world-class identity design",
-      "no mockup, no phone frame, no watermark, no gibberish text",
+      "one flat vector symbol, two to four solid colours, centered on a plain background",
+      "crisp edges, generous negative space, the name spelled once if a wordmark is needed",
+      "no mockup, no 3D plastic, no photo collage, no phone frame, no watermark, no extra letters",
       antiPerson,
     ].join(", ");
   }

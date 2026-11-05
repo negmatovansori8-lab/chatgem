@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import {
-  createLocalUser,
-  encodeSession,
-  sessionCookieOptions,
-} from "@/server/auth/session";
+import { userRepository } from "@/repositories/user-repository";
+import { encodeSession, sessionCookieOptions } from "@/server/auth/session";
 import type { AuthProviderId } from "@/server/auth/providers";
 import { resolveAppUrl, trimEnv } from "@/server/auth/app-url";
 
@@ -148,7 +145,7 @@ export async function GET(request: Request, { params }: Params) {
       );
     }
 
-    const user = createLocalUser({
+    const user = await userRepository.upsertOAuth({
       email: profile.email,
       name: profile.name || undefined,
       image: profile.image ?? null,
