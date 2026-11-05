@@ -145,11 +145,6 @@ function MarkdownBody({
           return "";
         }}
         components={{
-          img: ({ src }) =>
-            typeof src === "string" && /pollinations\.ai/i.test(src) ? null : (
-              // Model-written pictures stay out; real generated images use the image bubble.
-              <img src={typeof src === "string" ? src : undefined} alt="" className="max-w-full rounded-xl" />
-            ),
           a: ({ href, children }) =>
             href &&
             /^(?:video|audio)$/.test(mediaKindOf(mimeFromUrl(href))) &&
@@ -250,7 +245,7 @@ function MarkdownBody({
             </blockquote>
           ),
           img: ({ src, alt }) =>
-            typeof src === "string" && src ? (
+            typeof src === "string" && src && !/pollinations\.ai/i.test(src) ? (
               <span className="my-2 block space-y-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
