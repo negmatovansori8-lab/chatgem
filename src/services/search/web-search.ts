@@ -13,6 +13,7 @@ async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
 
   const res = await fetch(url.toString(), {
     headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(3500),
   });
   if (!res.ok) throw new Error(`DuckDuckGo failed: ${res.status}`);
   const data = (await res.json()) as {
@@ -72,41 +73,46 @@ export async function webSearch(query: string): Promise<WebSearchResponse> {
   const tavily = process.env.TAVILY_API_KEY?.trim();
 
   if (tavily) {
-    const res = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        api_key: tavily,
-        query,
-        search_depth: "basic",
-        max_results: 5,
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`Tavily search failed: ${res.status}`);
-    }
-    const data = (await res.json()) as {
-      results?: Array<{ title?: string; url?: string; content?: string }>;
-    };
-    const results: SearchResult[] = (data.results ?? []).map((r) => {
-      let domain = "";
-      try {
-        domain = r.url ? new URL(r.url).hostname : "";
-      } catch {
-        domain = "";
+    try {
+      const res = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(3500),
+        body: JSON.stringify({
+          api_key: tavily,
+          query,
+          search_depth: "basic",
+          max_results: 5,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`Tavily search failed: ${res.status}`);
       }
-      return {
-        title: r.title ?? "Untitled",
-        domain,
-        url: r.url ?? "",
-        snippet: r.content ?? "",
+      const data = (await res.json()) as {
+        results?: Array<{ title?: string; url?: string; content?: string }>;
       };
-    });
-    return {
-      configured: true,
-      results,
-      answerHint: "Sources from Tavily — listed separately from any AI answer.",
-    };
+      const results: SearchResult[] = (data.results ?? []).map((r) => {
+        let domain = "";
+        try {
+          domain = r.url ? new URL(r.url).hostname : "";
+        } catch {
+          domain = "";
+        }
+        return {
+          title: r.title ?? "Untitled",
+          domain,
+          url: r.url ?? "",
+          snippet: r.content ?? "",
+        };
+      });
+      return {
+        configured: true,
+        results,
+        answerHint: "Sources from Tavily — listed separately from any AI answer.",
+      };
+    } catch {
+      // A slow or failed search must not hold the answer. The free source is next.
+    }
   }
 
   try {

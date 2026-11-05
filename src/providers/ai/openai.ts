@@ -13,7 +13,7 @@ type CompatibleConfig = {
 };
 
 /** A stalled provider must fail over to the next model instead of hanging the chat. */
-const FIRST_BYTE_TIMEOUT_MS = 35_000;
+const FIRST_BYTE_TIMEOUT_MS = 8_000;
 const IDLE_TIMEOUT_MS = 30_000;
 
 async function* streamCompatible(

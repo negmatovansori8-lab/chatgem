@@ -44,7 +44,7 @@ function attempts(
 
   const dalle: Attempt = {
     label: "dall-e-3",
-    timeoutMs: 90_000,
+    timeoutMs: 45_000,
     body: {
       model: "dall-e-3",
       prompt: p,
@@ -56,47 +56,51 @@ function attempts(
 
   const gpt: Attempt = {
     label: "gpt-image-1",
-    timeoutMs: 90_000,
+    timeoutMs: 45_000,
     body: {
       model: "gpt-image-1",
       prompt: p,
       n: 1,
       size,
       quality: gptQuality,
-      ...(logo ? { background: "transparent", output_format: "png" } : {}),
     },
   };
 
   return logo ? [gpt, dalle] : [dalle, gpt];
 }
 
-function openAiErrorCode(raw: string): string {
+function openAiErrorParts(raw: string): { message: string; code: string } {
   try {
-    const err = (JSON.parse(raw) as { error?: { code?: string | null; type?: string } }).error;
-    return err?.code || err?.type || "";
+    const err = (JSON.parse(raw) as { error?: { code?: string | null; type?: string; message?: string } }).error;
+    return {
+      message: (err?.message || "").replace(/\s+/g, " ").trim(),
+      code: err?.code || err?.type || "",
+    };
   } catch {
-    return "";
+    return { message: raw.replace(/\s+/g, " ").trim().slice(0, 240), code: "" };
   }
 }
 
 function friendlyOpenAiError(raw: string, status: number, label: string): string {
-  const lower = raw.toLowerCase();
+  const { message, code } = openAiErrorParts(raw);
+  const lower = `${code} ${message}`.toLowerCase();
+  const short = message.slice(0, 220);
   if (/insufficient_quota|billing|credit/.test(lower)) {
-    const code = openAiErrorCode(raw);
     return `OpenAI billing or quota limit${code ? ` (${code})` : ""} — check platform.openai.com → Billing.`;
   }
-  if (status === 401 || /invalid.?api|incorrect.?api/.test(lower)) {
+  if (status === 401 || /invalid.?api.?key|incorrect.?api/.test(lower)) {
     return "OpenAI API key is invalid.";
   }
   if (status === 429 || /rate.?limit/.test(lower)) {
     return "OpenAI rate limit — wait a moment and retry.";
   }
-  if (/content.?policy|safety|moderation/.test(lower)) {
+  if (/content.?policy|safety system|moderation/.test(lower)) {
     return "Prompt was rejected by content policy — try rephrasing.";
   }
-  if (/unknown.?parameter|invalid/.test(lower)) {
-    return `${label} rejected the request — try another aspect or quality.`;
+  if (/model_not_found|does not exist|not available/.test(lower)) {
+    return `${label} is not enabled on this OpenAI account. ${short}`.trim();
   }
+  if (short) return `${label}: ${short}`;
   return `${label} could not generate this image (${status || "err"}).`;
 }
 

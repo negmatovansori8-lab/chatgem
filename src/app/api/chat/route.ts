@@ -667,24 +667,26 @@ export async function POST(request: Request) {
   })();
   const replyLocale = parsed.data.locale || cookieLocale || "tg";
 
-  let webBlock = "";
-  if (
-    parsed.data.webSearch ||
-    (needsWebSearch(userContent) && !imageDataUrls.length)
-  ) {
-    const found = await searchContextForChat(userContent);
-    webBlock = found.block;
-  }
+  const wantWeb =
+    parsed.data.webSearch || (needsWebSearch(userContent) && !imageDataUrls.length);
   const encyclopediaTopic = imageDataUrls.length ? null : encyclopediaSubject(userContent);
+  const [found, entry] = await Promise.all([
+    wantWeb
+      ? searchContextForChat(userContent).catch(() => ({ block: "", results: [] as never[] }))
+      : Promise.resolve({ block: "", results: [] as never[] }),
+    encyclopediaTopic
+      ? lookupEncyclopedia(
+          encyclopediaTopic,
+          AbortSignal.any([request.signal, AbortSignal.timeout(2500)]),
+        ).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+  let webBlock = found.block;
   if (encyclopediaTopic) {
-    const entry = await lookupEncyclopedia(
-      encyclopediaTopic,
-      AbortSignal.any([request.signal, AbortSignal.timeout(7000)]),
-    ).catch(() => null);
-        const note = entry
-          ? encyclopediaBlock(entry)
-          : `ENCYCLOPEDIA REFERENCE: none found for «${encyclopediaTopic}». Answer only from facts you are sure of (it may be a historical figure, a place or a known person under another spelling). If you do not reliably know this subject, say so in one or two sentences and ask the user to clarify. Never invent meanings, etymologies, tables or "possible interpretations".`;
-        webBlock = [webBlock, note].filter(Boolean).join("\n\n");
+    const note = entry
+      ? encyclopediaBlock(entry)
+      : `ENCYCLOPEDIA REFERENCE: none found for «${encyclopediaTopic}». Answer only from facts you are sure of (it may be a historical figure, a place or a known person under another spelling). If you do not reliably know this subject, say so in one or two sentences and ask the user to clarify. Never invent meanings, etymologies, tables or "possible interpretations".`;
+    webBlock = [webBlock, note].filter(Boolean).join("\n\n");
   }
 
   const voiceTurn = Boolean(parsed.data.voice);
